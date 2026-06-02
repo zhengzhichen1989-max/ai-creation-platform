@@ -5,7 +5,7 @@ import * as generationsApi from '@/api/generations';
 import { HistoryCard } from './HistoryCard';
 
 interface HistoryGridProps {
-  type?: 'image' | 'video';
+  type?: 'image' | 'video' | 'text';
 }
 
 export function HistoryGrid({ type }: HistoryGridProps) {

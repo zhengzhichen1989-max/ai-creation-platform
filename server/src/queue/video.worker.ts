@@ -1,21 +1,18 @@
 // ============================================================
-// AI创作聚合平台 - 视频生成 Worker
+// AI创作聚合平台 - 视频生成 Worker（真实API）
 // ============================================================
 
-import { KlingAdapter } from "../adapters/kling.adapter.js";
-import { SeedanceAdapter } from "../adapters/seedance.adapter.js";
-import { SoraAdapter } from "../adapters/sora.adapter.js";
-import type { IModelAdapter } from "../adapters/base.adapter.js";
+import { DMXAPIVideoAdapter } from "../adapters/dmxapi-video.adapter.js";
 import type { QueueJobData, QueueProcessor } from "./index.js";
 import * as taskService from "../services/task.service.js";
 import * as creditsService from "../services/credits.service.js";
-import type { GenerateParams } from "../types/index.js";
+import type { GenerateParams, AdapterResult, TaskStatusResult } from "../types/index.js";
 
-/** 适配器注册表 */
-const adapterMap: Record<string, () => IModelAdapter> = {
-  KlingAdapter: () => new KlingAdapter(),
-  SeedanceAdapter: () => new SeedanceAdapter(),
-  SoraAdapter: () => new SoraAdapter(),
+/** 适配器注册表：按模型ID路由到对应适配器（使用DMXAPI真实模型ID） */
+const adapterMap: Record<string, (modelId: string) => DMXAPIVideoAdapter> = {
+  'doubao-seedance-2-0-fast-260128': (modelId) => new DMXAPIVideoAdapter(modelId),
+  'sora-2': (modelId) => new DMXAPIVideoAdapter(modelId),
+  'kling-v3-video-generation': (modelId) => new DMXAPIVideoAdapter(modelId),
 };
 
 /** 视频生成处理器 */
@@ -29,12 +26,11 @@ export const videoProcessor: QueueProcessor = async (job: QueueJobData): Promise
     taskService.updateTaskStatus(taskId, "processing", { progress: 5 });
 
     // 2. 获取适配器
-    const model = await import("../services/model.service.js").then((m) => m.getModel(modelId));
-    const adapterFactory = adapterMap[model.id] || adapterMap[model.id.replace(/-/g, "")];
+    const adapterFactory = adapterMap[modelId];
     if (!adapterFactory) {
       throw new Error(`未找到模型适配器: ${modelId}`);
     }
-    const adapter = adapterFactory();
+    const adapter = adapterFactory(modelId);
 
     // 3. 调用适配器生成
     taskService.updateTaskStatus(taskId, "processing", { progress: 15 });
@@ -42,8 +38,8 @@ export const videoProcessor: QueueProcessor = async (job: QueueJobData): Promise
     const result = await adapter.generate(prompt, generateParams);
 
     // 4. 视频生成通常是异步的，需要轮询
-    let status = result;
-    const maxPolls = 60; // 最多轮询60次
+    let status: AdapterResult | TaskStatusResult = result;
+    const maxPolls = 60; // 最多轮询60次（约10分钟）
     let pollCount = 0;
 
     while (status.status !== "completed" && status.status !== "failed" && pollCount < maxPolls) {

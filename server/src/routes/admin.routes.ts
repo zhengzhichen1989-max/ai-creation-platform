@@ -42,7 +42,7 @@ const modelIdSchema = z.object({
 const modelCreateSchema = z.object({
   id: z.string().min(1, "模型ID不能为空"),
   name: z.string().min(1, "模型名称不能为空"),
-  type: z.enum(["image", "video"], { message: "模型类型必须是 image 或 video" }),
+  type: z.enum(["image", "video", "text"], { message: "模型类型必须是 image、video 或 text" }),
   category: z.enum(["starter", "standard", "advanced", "flagship"], { message: "定位无效" }),
   cost_credits: z.number().int().positive("消耗积分必须为正整数"),
   adapter_class: z.string().min(1, "适配器类名不能为空"),
@@ -55,7 +55,7 @@ const modelCreateSchema = z.object({
 
 const modelUpdateSchema = z.object({
   name: z.string().min(1, "模型名称不能为空").optional(),
-  type: z.enum(["image", "video"]).optional(),
+  type: z.enum(["image", "video", "text"]).optional(),
   category: z.enum(["starter", "standard", "advanced", "flagship"]).optional(),
   cost_credits: z.number().int().positive("消耗积分必须为正整数").optional(),
   adapter_class: z.string().min(1, "适配器类名不能为空").optional(),

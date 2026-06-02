@@ -1,10 +1,11 @@
 import { Tabs, Tab } from '@mui/material';
 import ImageIcon from '@mui/icons-material/Image';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
+import ArticleIcon from '@mui/icons-material/Article';
 
 interface ModelTabsProps {
-  activeTab: 'image' | 'video';
-  onTabChange: (tab: 'image' | 'video') => void;
+  activeTab: 'image' | 'video' | 'text';
+  onTabChange: (tab: 'image' | 'video' | 'text') => void;
 }
 
 export function ModelTabs({ activeTab, onTabChange }: ModelTabsProps) {
@@ -27,6 +28,13 @@ export function ModelTabs({ activeTab, onTabChange }: ModelTabsProps) {
         iconPosition="start"
         label="视频模型"
         value="video"
+        sx={{ textTransform: 'none' }}
+      />
+      <Tab
+        icon={<ArticleIcon />}
+        iconPosition="start"
+        label="文案模型"
+        value="text"
         sx={{ textTransform: 'none' }}
       />
     </Tabs>

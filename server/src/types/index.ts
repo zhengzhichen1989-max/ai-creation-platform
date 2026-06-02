@@ -47,7 +47,7 @@ export interface JwtPayload {
 }
 
 /** 模型类型 */
-export type ModelType = "image" | "video";
+export type ModelType = "image" | "video" | "text";
 
 /** 模型定位 */
 export type ModelCategory = "starter" | "standard" | "advanced" | "flagship";
@@ -66,6 +66,7 @@ export interface GenerateParams {
   seed?: number;
   duration?: number;
   fps?: number;
+  max_tokens?: number;
   [key: string]: unknown;
 }
 

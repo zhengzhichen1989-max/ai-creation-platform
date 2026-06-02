@@ -1,6 +1,7 @@
 import { Card, CardContent, CardMedia, Typography, Box, Chip } from '@mui/material';
 import ImageIcon from '@mui/icons-material/Image';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
+import ArticleIcon from '@mui/icons-material/Article';
 import dayjs from 'dayjs';
 import type { GenerationItem } from '@/api/generations';
 
@@ -10,6 +11,7 @@ interface HistoryCardProps {
 
 export function HistoryCard({ item }: HistoryCardProps) {
   const isVideo = item.type === 'video';
+  const isText = item.type === 'text';
   const thumbnailUrl = item.resultThumbnail || item.resultUrl;
 
   return (
@@ -45,6 +47,8 @@ export function HistoryCard({ item }: HistoryCardProps) {
         >
           {isVideo ? (
             <VideoFileIcon sx={{ fontSize: 48, color: 'text.secondary' }} />
+          ) : isText ? (
+            <ArticleIcon sx={{ fontSize: 48, color: 'text.secondary' }} />
           ) : (
             <ImageIcon sx={{ fontSize: 48, color: 'text.secondary' }} />
           )}
@@ -54,8 +58,8 @@ export function HistoryCard({ item }: HistoryCardProps) {
       <CardContent sx={{ flexGrow: 1, py: 1.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
           <Chip
-            icon={isVideo ? <VideoFileIcon /> : <ImageIcon />}
-            label={isVideo ? '视频' : '图片'}
+            icon={isVideo ? <VideoFileIcon /> : isText ? <ArticleIcon /> : <ImageIcon />}
+            label={isVideo ? '视频' : isText ? '文案' : '图片'}
             size="small"
             variant="outlined"
             sx={{ height: 20, fontSize: 11 }}

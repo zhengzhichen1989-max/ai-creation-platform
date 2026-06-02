@@ -38,6 +38,18 @@ export const config = {
     password: process.env.REDIS_PASSWORD || undefined,
   },
 
+  /** API Provider 配置 */
+  providers: {
+    dmxapi: {
+      baseUrl: process.env.DMXAPI_BASE_URL || 'https://www.dmxapi.cn/v1',
+      apiKey: process.env.DMXAPI_API_KEY || '',
+    },
+    grsai: {
+      baseUrl: process.env.GRSAI_BASE_URL || 'https://grsai.dakka.com.cn',
+      apiKey: process.env.GRSAI_API_KEY || '',
+    },
+  },
+
   /** 上传目录 */
   uploadDir: process.env.UPLOAD_DIR || path.resolve(__dirname, "../../uploads"),
 

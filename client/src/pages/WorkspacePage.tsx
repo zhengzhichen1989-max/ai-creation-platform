@@ -5,16 +5,19 @@ import { ModelSelector } from '@/components/ModelSelector/ModelSelector';
 import { PromptInput } from '@/components/PromptInput/PromptInput';
 import { ImageResult } from '@/components/ResultViewer/ImageResult';
 import { VideoResult } from '@/components/ResultViewer/VideoResult';
+import { TextResult } from '@/components/ResultViewer/TextResult';
 import { TaskStatus } from '@/components/ResultViewer/TaskStatus';
 import { useCreateTask, useTaskPolling } from '@/hooks/useTasks';
 import { useBalance } from '@/hooks/useCredits';
 import type { AIModel } from '@/api/models';
 import type { GenerationTask } from '@/api/tasks';
 
+type ActiveTab = 'image' | 'video' | 'text';
+
 export default function WorkspacePage() {
   const [selectedModel, setSelectedModel] = useState<AIModel | null>(null);
   const [prompt, setPrompt] = useState('');
-  const [activeTab, setActiveTab] = useState<'image' | 'video'>('image');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('image');
   const [selectedDuration, setSelectedDuration] = useState<number | undefined>(undefined);
 
   const createTaskMutation = useCreateTask();
@@ -33,6 +36,11 @@ export default function WorkspacePage() {
       setSelectedDuration(undefined);
     }
   }, [selectedModel?.id]);
+
+  // 当 tab 变化时清除已选模型
+  useEffect(() => {
+    setSelectedModel(null);
+  }, [activeTab]);
 
   // 计算实际积分
   const actualCost = selectedModel?.type === 'video' && selectedDuration && selectedModel.durationPricing
@@ -57,7 +65,7 @@ export default function WorkspacePage() {
       },
       {
         onSuccess: (data) => {
-          poll(data.id, selectedModel.type);
+          poll(data.id, selectedModel.type as 'image' | 'video' | 'text');
           refetchBalance();
         },
       },
@@ -66,6 +74,20 @@ export default function WorkspacePage() {
 
   const isGenerating = createTaskMutation.isPending || isPolling;
   const canGenerate = selectedModel && prompt.trim().length > 0 && !isGenerating;
+
+  /** Render the appropriate result viewer based on task type */
+  const renderResult = (task: GenerationTask) => {
+    if (task.type === 'image') {
+      return <ImageResult task={task} />;
+    }
+    if (task.type === 'video') {
+      return <VideoResult task={task} />;
+    }
+    if (task.type === 'text') {
+      return <TextResult task={task} />;
+    }
+    return null;
+  };
 
   return (
     <Box>
@@ -118,11 +140,7 @@ export default function WorkspacePage() {
               <Typography variant="h6" sx={{ mb: 2 }}>
                 生成结果
               </Typography>
-              {task.type === 'image' ? (
-                <ImageResult task={task as GenerationTask} />
-              ) : (
-                <VideoResult task={task as GenerationTask} />
-              )}
+              {renderResult(task as GenerationTask)}
             </Paper>
           )}
 

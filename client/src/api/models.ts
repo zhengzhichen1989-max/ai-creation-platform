@@ -4,7 +4,7 @@ import type { ApiResponse } from './auth';
 export interface AIModel {
   id: string;
   name: string;
-  type: 'image' | 'video';
+  type: 'image' | 'video' | 'text';
   category: 'starter' | 'standard' | 'advanced' | 'flagship';
   costCredits: number;
   config: string | null;
@@ -13,7 +13,7 @@ export interface AIModel {
 }
 
 /** List all available models, optionally filtered by type */
-export async function listModels(type?: 'image' | 'video'): Promise<AIModel[]> {
+export async function listModels(type?: 'image' | 'video' | 'text'): Promise<AIModel[]> {
   const params: Record<string, string> = {};
   if (type) params.type = type;
   const res = await apiClient.get<ApiResponse<AIModel[]>>('/models', { params });

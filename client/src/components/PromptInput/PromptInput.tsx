@@ -10,7 +10,7 @@ interface PromptInputProps {
   costCredits: number;
   currentBalance: number;
   selectedModelName: string;
-  selectedModelType?: 'image' | 'video';
+  selectedModelType?: 'image' | 'video' | 'text';
   durationOptions?: number[] | null;
   durationPricing?: Record<string, number> | null;
   selectedDuration?: number;

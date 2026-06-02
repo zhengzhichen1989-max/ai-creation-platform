@@ -54,7 +54,7 @@ export interface AdminAiModel {
 export interface AdminModelCreatePayload {
   id: string;
   name: string;
-  type: 'image' | 'video';
+  type: 'image' | 'video' | 'text';
   category: 'starter' | 'standard' | 'advanced' | 'flagship';
   cost_credits: number;
   adapter_class: string;
@@ -67,7 +67,7 @@ export interface AdminModelCreatePayload {
 
 export interface AdminModelUpdatePayload {
   name?: string;
-  type?: 'image' | 'video';
+  type?: 'image' | 'video' | 'text';
   category?: 'starter' | 'standard' | 'advanced' | 'flagship';
   cost_credits?: number;
   adapter_class?: string;

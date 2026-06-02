@@ -5,8 +5,8 @@ import { useModels } from '@/hooks/useModels';
 import type { AIModel } from '@/api/models';
 
 interface ModelSelectorProps {
-  activeTab: 'image' | 'video';
-  onTabChange: (tab: 'image' | 'video') => void;
+  activeTab: 'image' | 'video' | 'text';
+  onTabChange: (tab: 'image' | 'video' | 'text') => void;
   selectedModelId: string | null;
   onSelectModel: (model: AIModel) => void;
 }

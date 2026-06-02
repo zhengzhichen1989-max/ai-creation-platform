@@ -1,6 +1,7 @@
 import { Card, CardContent, Typography, Chip, Box } from '@mui/material';
 import ImageIcon from '@mui/icons-material/Image';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
+import ArticleIcon from '@mui/icons-material/Article';
 import type { AIModel } from '@/api/models';
 
 interface ModelCardProps {
@@ -25,6 +26,7 @@ const CATEGORY_COLORS: Record<string, 'default' | 'primary' | 'secondary' | 'err
 
 export function ModelCard({ model, selected, onClick }: ModelCardProps) {
   const isVideo = model.type === 'video';
+  const isText = model.type === 'text';
 
   return (
     <Card
@@ -46,6 +48,8 @@ export function ModelCard({ model, selected, onClick }: ModelCardProps) {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
           {isVideo ? (
             <VideoFileIcon fontSize="small" color="secondary" />
+          ) : isText ? (
+            <ArticleIcon fontSize="small" sx={{ color: '#ff9800' }} />
           ) : (
             <ImageIcon fontSize="small" color="primary" />
           )}

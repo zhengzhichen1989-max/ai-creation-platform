@@ -5,9 +5,10 @@
 import { config } from "./config/index.js";
 import { initDatabase, closeDatabase } from "./db/index.js";
 import { runMigration } from "./db/migrate.js";
-import { initQueues, registerImageProcessor, registerVideoProcessor } from "./queue/index.js";
+import { initQueues, registerImageProcessor, registerVideoProcessor, registerTextProcessor } from "./queue/index.js";
 import { imageProcessor } from "./queue/image.worker.js";
 import { videoProcessor } from "./queue/video.worker.js";
+import { textProcessor } from "./queue/text.worker.js";
 import { buildApp } from "./app.js";
 import * as expiryService from "./services/expiry.service.js";
 import fs from "fs";
@@ -37,6 +38,7 @@ async function main() {
   await initQueues();
   registerImageProcessor(imageProcessor);
   registerVideoProcessor(videoProcessor);
+  registerTextProcessor(textProcessor);
 
   // 4. 构建 Fastify 应用
   console.log("[Init] 构建 Fastify 应用...");

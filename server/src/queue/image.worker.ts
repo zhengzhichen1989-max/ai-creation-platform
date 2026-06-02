@@ -1,21 +1,19 @@
 // ============================================================
-// AI创作聚合平台 - 图片生成 Worker
+// AI创作聚合平台 - 图片生成 Worker（真实API）
 // ============================================================
 
-import { FluxAdapter } from "../adapters/flux.adapter.js";
-import { StableDiffusionAdapter } from "../adapters/stable-diffusion.adapter.js";
-import { DallEAdapter } from "../adapters/dalle.adapter.js";
-import type { IModelAdapter } from "../adapters/base.adapter.js";
+import { GrsAIImageAdapter } from "../adapters/grsai-image.adapter.js";
 import type { QueueJobData, QueueProcessor } from "./index.js";
 import * as taskService from "../services/task.service.js";
 import * as creditsService from "../services/credits.service.js";
-import type { GenerateParams } from "../types/index.js";
+import type { GenerateParams, AdapterResult, TaskStatusResult } from "../types/index.js";
 
-/** 适配器注册表 */
-const adapterMap: Record<string, () => IModelAdapter> = {
-  FluxAdapter: () => new FluxAdapter(),
-  StableDiffusionAdapter: () => new StableDiffusionAdapter(),
-  DallEAdapter: () => new DallEAdapter(),
+/** 适配器注册表：按模型ID路由到对应适配器 */
+const adapterMap: Record<string, (modelId: string) => GrsAIImageAdapter> = {
+  'gpt-image-2': (modelId) => new GrsAIImageAdapter(modelId),
+  'nano-banana-pro': (modelId) => new GrsAIImageAdapter(modelId),
+  'nano-banana-fast': (modelId) => new GrsAIImageAdapter(modelId),
+  'flux-pro': (modelId) => new GrsAIImageAdapter(modelId),
 };
 
 /** 图片生成处理器 */
@@ -29,19 +27,18 @@ export const imageProcessor: QueueProcessor = async (job: QueueJobData): Promise
     taskService.updateTaskStatus(taskId, "processing", { progress: 10 });
 
     // 2. 获取适配器
-    const model = await import("../services/model.service.js").then((m) => m.getModel(modelId));
-    const adapterFactory = adapterMap[model.id] || adapterMap[model.id.replace(/-/g, "")];
+    const adapterFactory = adapterMap[modelId];
     if (!adapterFactory) {
       throw new Error(`未找到模型适配器: ${modelId}`);
     }
-    const adapter = adapterFactory();
+    const adapter = adapterFactory(modelId);
 
     // 3. 调用适配器生成
     taskService.updateTaskStatus(taskId, "processing", { progress: 30 });
     const generateParams: GenerateParams = params ? JSON.parse(params) : {};
     const result = await adapter.generate(prompt, generateParams);
 
-    // 4. 更新任务状态
+    // 4. GrsAI图片生成是异步的，需要轮询
     if (result.status === "completed") {
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().replace("T", " ").replace(/\.\d+Z$/, "");
       taskService.updateTaskStatus(taskId, "completed", {
@@ -52,14 +49,20 @@ export const imageProcessor: QueueProcessor = async (job: QueueJobData): Promise
       });
       console.log(`[ImageWorker] 任务完成: ${taskId}`);
     } else {
-      // 图片生成通常是同步完成的，如果未完成则持续轮询
-      let status = result;
-      while (status.status !== "completed" && status.status !== "failed") {
+      // 轮询等待结果
+      let status: AdapterResult | TaskStatusResult = result;
+      const maxPolls = 120; // 最多轮询120次（约4分钟）
+      let pollCount = 0;
+
+      while (status.status !== "completed" && status.status !== "failed" && pollCount < maxPolls) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
+        pollCount++;
+
         status = await adapter.checkStatus(result.taskId);
-        taskService.updateTaskStatus(taskId, "processing", {
-          progress: status.progress,
-        });
+        const progress = status.progress ?? Math.min(30 + pollCount * 0.6, 95);
+        taskService.updateTaskStatus(taskId, "processing", { progress: Math.floor(progress) });
+
+        console.log(`[ImageWorker] 任务 ${taskId} 轮询 ${pollCount}/${maxPolls}, 状态: ${status.status}`);
       }
 
       if (status.status === "completed") {
@@ -70,8 +73,10 @@ export const imageProcessor: QueueProcessor = async (job: QueueJobData): Promise
           expiresAt,
         });
         console.log(`[ImageWorker] 任务完成: ${taskId}`);
-      } else {
+      } else if (status.status === "failed") {
         throw new Error(status.errorMessage || "图片生成失败");
+      } else {
+        throw new Error("图片生成超时");
       }
     }
   } catch (error) {

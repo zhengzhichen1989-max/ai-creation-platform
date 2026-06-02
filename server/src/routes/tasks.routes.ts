@@ -7,7 +7,7 @@ import { z } from "zod";
 import * as taskService from "../services/task.service.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 import { successResponse, paginatedResponse } from "../utils/helpers.js";
-import { addImageJob, addVideoJob } from "../queue/index.js";
+import { addImageJob, addVideoJob, addTextJob } from "../queue/index.js";
 import type { ModelType, TaskStatus, GenerateParams } from "../types/index.js";
 
 const createTaskSchema = z.object({
@@ -27,7 +27,7 @@ export async function tasksRoutes(app: FastifyInstance): Promise<void> {
     const duration = body.duration;
     const task = taskService.createTask(userId, body.modelId, body.prompt, body.params as GenerateParams, duration);
 
-    // 推入队列
+    // 根据类型推入对应队列
     if (task.type === "image") {
       await addImageJob({
         taskId: task.id,
@@ -37,13 +37,22 @@ export async function tasksRoutes(app: FastifyInstance): Promise<void> {
         type: "image",
         params: task.params ?? undefined,
       });
-    } else {
+    } else if (task.type === "video") {
       await addVideoJob({
         taskId: task.id,
         userId,
         modelId: task.modelId,
         prompt: task.prompt,
         type: "video",
+        params: task.params ?? undefined,
+      });
+    } else if (task.type === "text") {
+      await addTextJob({
+        taskId: task.id,
+        userId,
+        modelId: task.modelId,
+        prompt: task.prompt,
+        type: "text",
         params: task.params ?? undefined,
       });
     }

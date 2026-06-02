@@ -137,6 +137,14 @@ export async function runMigration(): Promise<void> {
     console.log("[Migration] generation_tasks.expires_at 字段已存在，跳过迁移");
   }
 
+  // 新增 provider 字段迁移
+  try {
+    sqlite.run("ALTER TABLE ai_models ADD COLUMN provider TEXT");
+    console.log("[Migration] 已为 ai_models 表添加 provider 字段");
+  } catch {
+    console.log("[Migration] ai_models.provider 字段已存在，跳过迁移");
+  }
+
   // 插入种子数据：管理员账户
   const adminCountResult = sqlite.exec("SELECT COUNT(*) as cnt FROM users WHERE email = ?", ["admin@aicreation.com"]);
   const adminCount = adminCountResult[0]?.values[0]?.[0] as number || 0;
@@ -149,27 +157,34 @@ export async function runMigration(): Promise<void> {
     console.log("[Migration] 管理员种子账户插入完成");
   }
 
-  // 插入种子数据：AI模型
-  const modelCountResult = sqlite.exec("SELECT COUNT(*) as cnt FROM ai_models");
-  const modelCount = modelCountResult[0]?.values[0]?.[0] as number || 0;
-  if (modelCount === 0) {
-    const models = [
-      { id: "flux-pro", name: "Flux Pro", type: "image", category: "advanced", cost_credits: 6, adapter_class: "FluxAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 1, duration_options: null, duration_pricing: null },
-      { id: "stable-diffusion", name: "Stable Diffusion XL", type: "image", category: "starter", cost_credits: 3, adapter_class: "StableDiffusionAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 2, duration_options: null, duration_pricing: null },
-      { id: "dall-e", name: "DALL-E 3", type: "image", category: "flagship", cost_credits: 10, adapter_class: "DallEAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 3, duration_options: null, duration_pricing: null },
-      { id: "kling", name: "可灵AI", type: "video", category: "standard", cost_credits: 15, adapter_class: "KlingAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 4, duration_options: "[5,10]", duration_pricing: '{"5":15,"10":25}' },
-      { id: "seedance", name: "Seedance", type: "video", category: "advanced", cost_credits: 20, adapter_class: "SeedanceAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 5, duration_options: "[5,10,15]", duration_pricing: '{"5":20,"10":35,"15":50}' },
-      { id: "sora", name: "Sora", type: "video", category: "flagship", cost_credits: 30, adapter_class: "SoraAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 10, defaultFps: 24 }), sort_order: 6, duration_options: "[5,10,15]", duration_pricing: '{"5":20,"10":30,"15":45}' },
-    ];
+  // 删除旧模型数据，插入新的9个真实模型
+  // 先删除所有旧模型
+  sqlite.run("DELETE FROM ai_models");
+  console.log("[Migration] 已清除旧模型数据");
 
-    for (const m of models) {
-      sqlite.run(
-        "INSERT INTO ai_models (id, name, type, category, cost_credits, adapter_class, enabled, config, sort_order, duration_options, duration_pricing) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [m.id, m.name, m.type, m.category, m.cost_credits, m.adapter_class, m.enabled, m.config, m.sort_order, m.duration_options, m.duration_pricing]
-      );
-    }
-    console.log("[Migration] AI模型种子数据插入完成（6条）");
+  // 注意：模型 id 使用 DMXAPI/GrsAI 实际的模型ID，前端显示名保持友好名称
+  const models = [
+    // GrsAI 图片模型
+    { id: "gpt-image-2", name: "GPT Image 2", type: "image", category: "flagship", cost_credits: 5, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 1, duration_options: null, duration_pricing: null, provider: "grsai" },
+    { id: "nano-banana-pro", name: "Nano Banana Pro", type: "image", category: "advanced", cost_credits: 3, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 2, duration_options: null, duration_pricing: null, provider: "grsai" },
+    { id: "nano-banana-fast", name: "Nano Banana Fast", type: "image", category: "starter", cost_credits: 1, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 3, duration_options: null, duration_pricing: null, provider: "grsai" },
+    { id: "flux-pro", name: "Flux Pro", type: "image", category: "standard", cost_credits: 4, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 4, duration_options: null, duration_pricing: null, provider: "grsai" },
+    // DMXAPI 视频模型（id使用真实模型ID，name保持前端友好显示名）
+    { id: "doubao-seedance-2-0-fast-260128", name: "Seedance 2.0", type: "video", category: "advanced", cost_credits: 20, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 5, duration_options: "[5,10,15]", duration_pricing: '{"5":20,"10":35,"15":50}', provider: "dmxapi" },
+    { id: "sora-2", name: "Sora 2", type: "video", category: "flagship", cost_credits: 30, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 4, defaultFps: 24 }), sort_order: 6, duration_options: "[4,8,12]", duration_pricing: '{"4":20,"8":30,"12":45}', provider: "dmxapi" },
+    { id: "kling-v3-video-generation", name: "可灵 Kling 3.0", type: "video", category: "standard", cost_credits: 15, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 7, duration_options: "[5,10]", duration_pricing: '{"5":15,"10":25}', provider: "dmxapi" },
+    // DMXAPI 文案模型（id使用真实模型ID，name保持前端友好显示名）
+    { id: "deepseek-chat", name: "DeepSeek V4", type: "text", category: "starter", cost_credits: 2, adapter_class: "DMXAPITextAdapter", enabled: 1, config: null, sort_order: 8, duration_options: null, duration_pricing: null, provider: "dmxapi" },
+    { id: "qwen-max", name: "Qwen3-Max", type: "text", category: "standard", cost_credits: 3, adapter_class: "DMXAPITextAdapter", enabled: 1, config: null, sort_order: 9, duration_options: null, duration_pricing: null, provider: "dmxapi" },
+  ];
+
+  for (const m of models) {
+    sqlite.run(
+      "INSERT INTO ai_models (id, name, type, category, cost_credits, adapter_class, enabled, config, sort_order, duration_options, duration_pricing, provider) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [m.id, m.name, m.type, m.category, m.cost_credits, m.adapter_class, m.enabled, m.config, m.sort_order, m.duration_options, m.duration_pricing, m.provider]
+    );
   }
+  console.log("[Migration] AI模型种子数据插入完成（9条）");
 
   // 插入种子数据：积分包
   const packageCountResult = sqlite.exec("SELECT COUNT(*) as cnt FROM credit_packages");

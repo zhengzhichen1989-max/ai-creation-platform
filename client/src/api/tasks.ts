@@ -2,7 +2,7 @@ import apiClient from './client';
 import type { ApiResponse } from './auth';
 
 export type TaskStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
-export type TaskType = 'image' | 'video';
+export type TaskType = 'image' | 'video' | 'text';
 
 export interface GenerationTask {
   id: string;

@@ -348,6 +348,7 @@ const defaultModelForm: ModelFormData = {
 const MODEL_TYPES = [
   { value: 'image', label: '图片生成' },
   { value: 'video', label: '视频生成' },
+  { value: 'text', label: '文案生成' },
 ];
 
 const MODEL_CATEGORIES = [
@@ -415,7 +416,7 @@ function ModelManager() {
       if (editingId) {
         const payload: AdminModelUpdatePayload = {
           name: form.name,
-          type: form.type as 'image' | 'video',
+          type: form.type as 'image' | 'video' | 'text',
           category: form.category as 'starter' | 'standard' | 'advanced' | 'flagship',
           cost_credits: parseInt(form.cost_credits, 10),
           adapter_class: form.adapter_class,
@@ -431,7 +432,7 @@ function ModelManager() {
         const payload: AdminModelCreatePayload = {
           id: form.id,
           name: form.name,
-          type: form.type as 'image' | 'video',
+          type: form.type as 'image' | 'video' | 'text',
           category: form.category as 'starter' | 'standard' | 'advanced' | 'flagship',
           cost_credits: parseInt(form.cost_credits, 10),
           adapter_class: form.adapter_class,
@@ -495,7 +496,7 @@ function ModelManager() {
                 <TableCell sx={{ fontFamily: 'monospace', fontSize: 13 }}>{model.id}</TableCell>
                 <TableCell>{model.name}</TableCell>
                 <TableCell>
-                  <Chip label={model.type === 'image' ? '图片' : '视频'} size="small" variant="outlined" />
+                  <Chip label={model.type === 'image' ? '图片' : model.type === 'video' ? '视频' : '文案'} size="small" variant="outlined" />
                 </TableCell>
                 <TableCell>
                   <Chip

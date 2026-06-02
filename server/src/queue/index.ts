@@ -11,7 +11,7 @@ export interface QueueJobData {
   userId: number;
   modelId: string;
   prompt: string;
-  type: "image" | "video";
+  type: "image" | "video" | "text";
   params?: string;
 }
 
@@ -31,14 +31,17 @@ export type QueueProcessor = (job: QueueJobData) => Promise<void>;
 // BullMQ 队列实例（如果Redis可用）
 let imageQueue: import("bullmq").Queue<QueueJobData> | null = null;
 let videoQueue: import("bullmq").Queue<QueueJobData> | null = null;
+let textQueue: import("bullmq").Queue<QueueJobData> | null = null;
 
 // 内存回退队列
 const memoryImageQueue: MemoryJob[] = [];
 const memoryVideoQueue: MemoryJob[] = [];
+const memoryTextQueue: MemoryJob[] = [];
 
 // 处理器注册
 let imageProcessor: QueueProcessor | null = null;
 let videoProcessor: QueueProcessor | null = null;
+let textProcessor: QueueProcessor | null = null;
 
 /** Redis 是否可用 */
 let redisAvailable = false;
@@ -67,6 +70,7 @@ export async function initQueues(): Promise<void> {
 
     imageQueue = new Queue<QueueJobData>("image-generation", { connection: { ...connection, maxRetriesPerRequest: null } });
     videoQueue = new Queue<QueueJobData>("video-generation", { connection: { ...connection, maxRetriesPerRequest: null } });
+    textQueue = new Queue<QueueJobData>("text-generation", { connection: { ...connection, maxRetriesPerRequest: null } });
 
     redisAvailable = true;
     console.log("[Queue] BullMQ 队列初始化成功（Redis模式）");
@@ -76,6 +80,7 @@ export async function initQueues(): Promise<void> {
     // 启动内存队列消费者
     startMemoryQueueConsumer("image");
     startMemoryQueueConsumer("video");
+    startMemoryQueueConsumer("text");
   }
 }
 
@@ -121,6 +126,27 @@ export async function addVideoJob(data: QueueJobData): Promise<string> {
   return data.taskId;
 }
 
+/** 将文案生成任务推入队列 */
+export async function addTextJob(data: QueueJobData): Promise<string> {
+  if (redisAvailable && textQueue) {
+    const job = await textQueue.add("text-gen", data, {
+      attempts: 3,
+      backoff: { type: "exponential", delay: 3000 },
+    });
+    return job.id ?? data.taskId;
+  }
+
+  // 内存回退
+  const job: MemoryJob = {
+    id: data.taskId,
+    data,
+    status: "waiting",
+    progress: 0,
+  };
+  memoryTextQueue.push(job);
+  return data.taskId;
+}
+
 /** 注册图片队列处理器 */
 export function registerImageProcessor(processor: QueueProcessor): void {
   imageProcessor = processor;
@@ -140,6 +166,15 @@ export function registerVideoProcessor(processor: QueueProcessor): void {
   }
 }
 
+/** 注册文案队列处理器 */
+export function registerTextProcessor(processor: QueueProcessor): void {
+  textProcessor = processor;
+
+  if (redisAvailable && textQueue) {
+    return;
+  }
+}
+
 /** 获取 BullMQ 队列实例 */
 export function getImageQueue(): import("bullmq").Queue<QueueJobData> | null {
   return imageQueue;
@@ -149,6 +184,10 @@ export function getVideoQueue(): import("bullmq").Queue<QueueJobData> | null {
   return videoQueue;
 }
 
+export function getTextQueue(): import("bullmq").Queue<QueueJobData> | null {
+  return textQueue;
+}
+
 /** 是否使用 BullMQ */
 export function isBullMQ(): boolean {
   return redisAvailable;
@@ -156,10 +195,10 @@ export function isBullMQ(): boolean {
 
 // ---- 内存队列消费者 ----
 
-function startMemoryQueueConsumer(type: "image" | "video"): void {
+function startMemoryQueueConsumer(type: "image" | "video" | "text"): void {
   const interval = setInterval(async () => {
-    const queue = type === "image" ? memoryImageQueue : memoryVideoQueue;
-    const processor = type === "image" ? imageProcessor : videoProcessor;
+    const queue = type === "image" ? memoryImageQueue : type === "video" ? memoryVideoQueue : memoryTextQueue;
+    const processor = type === "image" ? imageProcessor : type === "video" ? videoProcessor : textProcessor;
 
     if (!processor) return;
 

@@ -6,6 +6,7 @@ import type { GenerationTask, TaskStatus as TaskStatusType } from '@/api/tasks';
 /** Interval in ms for polling task status */
 const POLL_INTERVAL_IMAGE = 2000;
 const POLL_INTERVAL_VIDEO = 3000;
+const POLL_INTERVAL_TEXT = 1500;
 
 export function useCreateTask() {
   const queryClient = useQueryClient();
@@ -63,11 +64,15 @@ export function useTaskPolling() {
   }, []);
 
   const poll = useCallback(
-    (taskId: string, type: 'image' | 'video' = 'image') => {
+    (taskId: string, type: 'image' | 'video' | 'text' = 'image') => {
       stopPolling();
       setIsPolling(true);
 
-      const interval = type === 'video' ? POLL_INTERVAL_VIDEO : POLL_INTERVAL_IMAGE;
+      const interval = type === 'video'
+        ? POLL_INTERVAL_VIDEO
+        : type === 'text'
+          ? POLL_INTERVAL_TEXT
+          : POLL_INTERVAL_IMAGE;
 
       const tick = async () => {
         try {
