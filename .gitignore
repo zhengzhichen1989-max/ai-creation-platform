@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Database (never commit user data!)
+*.db
+*.sqlite
+server/data/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Uploads & generated files
+uploads/
+results/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Runtime
+*.pid
+*.seed
+pids/
+
+# Coverage
+coverage/
