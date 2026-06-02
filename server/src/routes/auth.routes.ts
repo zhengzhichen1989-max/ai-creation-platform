@@ -37,6 +37,11 @@ const verifySecurityAnswerSchema = z.object({
   answer: z.string().min(1, "请输入答案"),
 });
 
+const changePasswordSchema = z.object({
+  oldPassword: z.string().min(1, "旧密码不能为空"),
+  newPassword: z.string().min(8, "新密码至少8位").max(128),
+});
+
 const securityQuestionSchema = z.object({
   question: z.string().min(1, "安全问题不能为空").max(200),
   answer: z.string().min(1, "答案不能为空").max(200),
@@ -90,6 +95,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const body = verifySecurityAnswerSchema.parse(request.body);
     const result = await authService.verifySecurityAnswer(body.email, body.answer);
     reply.send(successResponse(result));
+  });
+
+  /** PUT /api/v1/auth/change-password - 修改密码（需认证） */
+  app.put("/change-password", { preHandler: authMiddleware }, async (request, reply) => {
+    const body = changePasswordSchema.parse(request.body);
+    const userId = request.userId!;
+    await authService.changePassword(userId, body.oldPassword, body.newPassword);
+    reply.send(successResponse({ message: "密码修改成功" }));
   });
 
   /** PUT /api/v1/auth/security-question - 设置安全问题（需认证） */

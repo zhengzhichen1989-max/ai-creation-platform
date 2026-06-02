@@ -84,3 +84,8 @@ export async function verifySecurityAnswer(email: string, answer: string): Promi
 export async function setSecurityQuestion(question: string, answer: string): Promise<void> {
   await apiClient.put<ApiResponse<{ message: string }>>('/auth/security-question', { question, answer });
 }
+
+/** Change password (authenticated, requires old password) */
+export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  await apiClient.put<ApiResponse<{ message: string }>>('/auth/change-password', { oldPassword, newPassword });
+}

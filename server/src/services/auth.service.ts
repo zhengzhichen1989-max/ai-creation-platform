@@ -234,6 +234,40 @@ export async function verifySecurityAnswer(email: string, answer: string): Promi
   return { token };
 }
 
+/** 修改密码（已登录用户，验证旧密码后更新） */
+export async function changePassword(userId: number, oldPassword: string, newPassword: string): Promise<void> {
+  const db = getDb();
+
+  // 查找用户
+  const rows = db.exec("SELECT password_hash FROM users WHERE id = ?", [userId]);
+  if (rows.length === 0 || rows[0].values.length === 0) {
+    throw new InvalidCredentialsError("用户不存在");
+  }
+
+  const passwordHash = rows[0].values[0][0] as string;
+
+  // 验证旧密码
+  const isMatch = await bcrypt.compare(oldPassword, passwordHash);
+  if (!isMatch) {
+    throw new InvalidCredentialsError("旧密码不正确");
+  }
+
+  // 新密码不能与旧密码相同
+  const isSame = await bcrypt.compare(newPassword, passwordHash);
+  if (isSame) {
+    throw new InvalidCredentialsError("新密码不能与旧密码相同");
+  }
+
+  // 更新密码
+  const newHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  db.run("UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?", [
+    newHash,
+    userId,
+  ]);
+
+  saveDatabase();
+}
+
 /** 设置安全问题（需认证） */
 export async function setSecurityQuestion(userId: number, question: string, answer: string): Promise<void> {
   const db = getDb();
