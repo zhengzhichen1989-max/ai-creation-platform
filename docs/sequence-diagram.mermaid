@@ -1,0 +1,135 @@
+# 管理员充值积分 - 时序图
+
+```mermaid
+sequenceDiagram
+    participant Admin as 管理员前端
+    participant Route as admin.routes.ts
+    participant AUS as admin-user.service.ts
+    participant CS as credits.service.ts
+    participant AOLS as admin-operation-log.service.ts
+    participant DB as sql.js
+
+    Admin->>Route: POST /admin/users/:id/credit-topup<br/>{ amount, description }
+    Route->>Route: Zod 校验 (amount 1~100000)
+    Route->>AUS: (校验用户存在)
+    AUS->>DB: SELECT id, status FROM users WHERE id=?
+    DB-->>AUS: user record
+    AUS-->>Route: 用户有效
+    Route->>CS: adminTopup(userId, amount, description, adminId)
+    CS->>DB: SELECT balance, version FROM credit_accounts WHERE user_id=?
+    DB-->>CS: balance, version
+    CS->>DB: UPDATE credit_accounts SET balance=?, version=?<br/>WHERE user_id=? AND version=?
+    CS->>DB: INSERT INTO credit_transactions (type='admin_topup', ...)
+    CS-->>Route: CreditTransactionInfo
+    Route->>AOLS: log(adminId, 'credit_topup', userId, {amount, description})
+    AOLS->>DB: INSERT INTO admin_operation_logs (...)
+    Route-->>Admin: { code:200, data: CreditTransactionInfo }
+```
+
+# 密码重置完整流程 - 时序图
+
+```mermaid
+sequenceDiagram
+    participant Admin as 管理员前端
+    participant User as 用户浏览器
+    participant Route as admin.routes.ts / auth.routes.ts
+    participant AUS as admin-user.service.ts
+    participant AS as auth.service.ts
+    participant AOLS as admin-operation-log.service.ts
+    participant DB as sql.js
+
+    rect rgb(240,248,255)
+        Note over Admin,DB: 1. 管理员生成重置链接
+        Admin->>Route: POST /admin/users/:id/reset-password
+        Route->>AUS: generateResetToken(userId, adminId)
+        AUS->>DB: SELECT id, email FROM users WHERE id=?
+        AUS->>DB: INSERT INTO password_reset_tokens<br/>(user_id, token, expires_at)
+        AUS->>AOLS: log(adminId, 'reset_password', userId, {...})
+        AUS-->>Route: { token, resetUrl }
+        Route-->>Admin: { resetUrl: "/reset-password?token=xxx" }
+        Note over Admin: 管理员复制链接发送给用户
+    end
+
+    rect rgb(255,248,240)
+        Note over User,DB: 2. 用户打开链接重置密码
+        User->>Route: POST /auth/reset-password { token, newPassword }
+        Route->>AS: resetPassword(token, newPassword)
+        AS->>DB: SELECT id, user_id, expires_at, used_at<br/>FROM password_reset_tokens WHERE token=?
+        alt Token无效或已使用或已过期
+            AS-->>Route: throw InvalidResetTokenError
+            Route-->>User: { code: 4010, message: "重置链接无效或已过期" }
+        else Token有效
+            AS->>DB: UPDATE users SET password_hash=? WHERE id=?
+            AS->>DB: UPDATE password_reset_tokens<br/>SET used_at=datetime('now') WHERE id=?
+            AS-->>Route: success
+            Route-->>User: { code: 200, message: "密码重置成功" }
+            User->>User: 重定向到登录页
+        end
+    end
+```
+
+# 禁用/启用用户 - 时序图
+
+```mermaid
+sequenceDiagram
+    participant Admin as 管理员前端
+    participant Route as admin.routes.ts
+    participant AUS as admin-user.service.ts
+    participant AOLS as admin-operation-log.service.ts
+    participant MW as auth.middleware.ts
+    participant DB as sql.js
+
+    Admin->>Route: PUT /admin/users/:id/status { status: 'disabled' }
+    Route->>AUS: updateUserStatus(userId, 'disabled', adminId)
+    AUS->>DB: SELECT id, role FROM users WHERE id=?
+    alt 用户是管理员
+        AUS-->>Route: throw ValidationError("不能禁用管理员账户")
+    else 普通用户
+        AUS->>DB: UPDATE users SET status='disabled', updated_at=datetime('now')<br/>WHERE id=?
+        AUS->>AOLS: log(adminId, 'disable_user', userId, {})
+        AUS-->>Route: AdminUserDetail
+    end
+    Route-->>Admin: { code: 200, data: AdminUserDetail }
+
+    Note over MW,DB: 被禁用用户的后续请求
+    participant User as 被禁用用户
+    User->>MW: 任意需认证的请求 (携带原JWT)
+    MW->>DB: SELECT role, status FROM users WHERE id=?
+    DB-->>MW: { role: 'user', status: 'disabled' }
+    MW-->>User: 401 AuthenticationError("账户已被禁用")
+```
+
+# 安全问题自助重置 - 时序图
+
+```mermaid
+sequenceDiagram
+    participant User as 用户浏览器
+    participant Route as auth.routes.ts
+    participant AS as auth.service.ts
+    participant DB as sql.js
+
+    User->>Route: POST /auth/forgot-password { email }
+    Route->>AS: forgotPassword(email)
+    AS->>DB: SELECT security_question FROM users WHERE email=?
+    alt 无安全问题
+        AS-->>Route: { hasSecurityQuestion: false }
+        Route-->>User: { hasSecurityQuestion: false, message: "请联系管理员重置密码" }
+    else 有安全问题
+        AS-->>Route: { hasSecurityQuestion: true, question: "..." }
+        Route-->>User: { hasSecurityQuestion: true, question: "您的宠物叫什么？" }
+    end
+
+    User->>Route: POST /auth/verify-security-answer { email, answer }
+    Route->>AS: verifySecurityAnswer(email, answer)
+    AS->>DB: SELECT id, security_answer_hash FROM users WHERE email=?
+    AS->>AS: bcrypt.compare(answer, security_answer_hash)
+    alt 答案错误
+        AS-->>Route: throw SecurityQuestionError
+        Route-->>User: { code: 4013, message: "安全问题答案错误" }
+    else 答案正确
+        AS->>DB: INSERT INTO password_reset_tokens<br/>(user_id, token, expires_at)
+        AS-->>Route: { token }
+        Route-->>User: { token }
+        Note over User: 前端携带token跳转到 /reset-password?token=xxx
+    end
+```

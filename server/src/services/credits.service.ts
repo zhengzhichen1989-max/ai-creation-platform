@@ -214,6 +214,72 @@ export function refund(
   throw new OptimisticLockError("积分退还冲突，请重试");
 }
 
+/** 管理员手动充值（乐观锁，原子操作） */
+export function adminTopup(
+  userId: number,
+  amount: number,
+  description: string,
+  adminEmail: string
+): CreditTransactionInfo {
+  if (amount <= 0) {
+    throw new Error("充值金额必须为正数");
+  }
+
+  if (amount > 100000) {
+    throw new Error("单次充值上限100,000积分");
+  }
+
+  const db = getDb();
+  const fullDescription = `管理员充值: ${adminEmail} - ${description}`;
+
+  for (let retry = 0; retry < MAX_RETRIES; retry++) {
+    const rows = db.exec("SELECT balance, version FROM credit_accounts WHERE user_id = ?", [userId]);
+    if (rows.length === 0 || rows[0].values.length === 0) {
+      throw new Error("积分账户不存在");
+    }
+
+    const account = rows[0].values[0];
+    const balance = account[0] as number;
+    const version = account[1] as number;
+
+    const newBalance = balance + amount;
+    const newVersion = version + 1;
+
+    db.run(
+      "UPDATE credit_accounts SET balance = ?, version = ?, updated_at = datetime('now') WHERE user_id = ? AND version = ?",
+      [newBalance, newVersion, userId, version]
+    );
+
+    const changesResult = db.getRowsModified();
+    if (changesResult === 0) {
+      continue;
+    }
+
+    db.run(
+      "INSERT INTO credit_transactions (user_id, type, amount, balance_after, reference_id, description) VALUES (?, 'admin_topup', ?, ?, ?, ?)",
+      [userId, amount, newBalance, null, fullDescription]
+    );
+
+    const lastIdResult = db.exec("SELECT last_insert_rowid()");
+    const lastId = lastIdResult[0].values[0][0] as number;
+
+    saveDatabase();
+
+    return {
+      id: lastId,
+      userId,
+      type: "admin_topup",
+      amount,
+      balanceAfter: newBalance,
+      referenceId: null,
+      description: fullDescription,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  throw new OptimisticLockError("管理员充值冲突，请重试");
+}
+
 /** 获取积分流水列表 */
 export function getTransactions(
   userId: number,

@@ -57,11 +57,18 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     request.userId = payload.userId;
     request.userEmail = payload.email;
 
-    // 从数据库查询用户角色（确保角色始终是最新的）
+    // 从数据库查询用户角色和状态（确保始终是最新的）
     const db = getDb();
-    const roleRows = db.exec("SELECT role FROM users WHERE id = ?", [payload.userId]);
+    const roleRows = db.exec("SELECT role, status FROM users WHERE id = ?", [payload.userId]);
     if (roleRows.length > 0 && roleRows[0].values.length > 0) {
-      request.userRole = roleRows[0].values[0][0] as string;
+      const role = roleRows[0].values[0][0] as string;
+      const status = roleRows[0].values[0][1] as string;
+      request.userRole = role;
+
+      // 检查用户状态，禁用用户直接拒绝
+      if (status !== "active") {
+        throw new AuthenticationError("账户已被禁用");
+      }
     } else {
       request.userRole = "user";
     }

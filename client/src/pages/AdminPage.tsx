@@ -44,6 +44,8 @@ import {
   type AdminModelCreatePayload,
   type AdminModelUpdatePayload,
 } from '@/api/admin';
+import UserListTab from './admin/UserListTab';
+import OperationLogTab from './admin/OperationLogTab';
 
 // ---- 通用 Tab Panel ----
 
@@ -687,6 +689,8 @@ export default function AdminPage() {
         <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
           <Tab label="积分套餐管理" />
           <Tab label="AI模型管理" />
+          <Tab label="用户管理" />
+          <Tab label="操作日志" />
         </Tabs>
       </Box>
 
@@ -695,6 +699,12 @@ export default function AdminPage() {
       </TabPanel>
       <TabPanel value={tabValue} index={1}>
         <ModelManager />
+      </TabPanel>
+      <TabPanel value={tabValue} index={2}>
+        <UserListTab />
+      </TabPanel>
+      <TabPanel value={tabValue} index={3}>
+        <OperationLogTab />
       </TabPanel>
     </Box>
   );

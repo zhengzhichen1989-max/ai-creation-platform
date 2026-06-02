@@ -5,8 +5,8 @@
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import { getDb, saveDatabase } from "../db/index.js";
-import type { AuthResult, UserInfo, JwtPayload } from "../types/index.js";
-import { UserExistsError, InvalidCredentialsError } from "../utils/errors.js";
+import type { AuthResult, UserInfo, JwtPayload, ForgotPasswordResult } from "../types/index.js";
+import { UserExistsError, InvalidCredentialsError, InvalidResetTokenError, SecurityQuestionError } from "../utils/errors.js";
 import { config } from "../config/index.js";
 
 const BCRYPT_ROUNDS = 10;
@@ -125,6 +125,127 @@ export function getUserById(userId: number): UserInfo {
     avatarUrl: user[3] as string | null,
     role: user[4] as string,
   };
+}
+
+/** 用户通过重置Token重置密码 */
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  const db = getDb();
+
+  // 查找有效的Token
+  const tokenRows = db.exec(
+    "SELECT id, user_id, expires_at, used_at FROM password_reset_tokens WHERE token = ?",
+    [token]
+  );
+
+  if (tokenRows.length === 0 || tokenRows[0].values.length === 0) {
+    throw new InvalidResetTokenError("重置链接无效或已过期");
+  }
+
+  const tokenRow = tokenRows[0].values[0];
+  const tokenId = tokenRow[0] as number;
+  const userId = tokenRow[1] as number;
+  const expiresAt = tokenRow[2] as string;
+  const usedAt = tokenRow[3] as string | null;
+
+  // 检查是否已使用
+  if (usedAt) {
+    throw new InvalidResetTokenError("重置链接已被使用");
+  }
+
+  // 检查是否过期
+  const expiresTime = new Date(expiresAt).getTime();
+  if (Date.now() > expiresTime) {
+    throw new InvalidResetTokenError("重置链接已过期");
+  }
+
+  // 更新密码
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  db.run("UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?", [
+    passwordHash,
+    userId,
+  ]);
+
+  // 标记Token已使用
+  db.run("UPDATE password_reset_tokens SET used_at = datetime('now') WHERE id = ?", [tokenId]);
+
+  saveDatabase();
+}
+
+/** 忘记密码 - 查询用户是否有安全问题 */
+export function forgotPassword(email: string): ForgotPasswordResult {
+  const db = getDb();
+
+  const rows = db.exec(
+    "SELECT security_question FROM users WHERE email = ?",
+    [email]
+  );
+
+  if (rows.length === 0 || rows[0].values.length === 0) {
+    // 用户不存在，仍返回无安全问题（不泄露用户是否存在）
+    return { hasSecurityQuestion: false, question: null };
+  }
+
+  const question = rows[0].values[0][0] as string | null;
+  if (!question) {
+    return { hasSecurityQuestion: false, question: null };
+  }
+
+  return { hasSecurityQuestion: true, question };
+}
+
+/** 验证安全问题答案 */
+export async function verifySecurityAnswer(email: string, answer: string): Promise<{ token: string }> {
+  const db = getDb();
+
+  const rows = db.exec(
+    "SELECT id, security_answer_hash FROM users WHERE email = ?",
+    [email]
+  );
+
+  if (rows.length === 0 || rows[0].values.length === 0) {
+    throw new SecurityQuestionError("用户不存在或未设置安全问题");
+  }
+
+  const userRow = rows[0].values[0];
+  const userId = userRow[0] as number;
+  const answerHash = userRow[1] as string | null;
+
+  if (!answerHash) {
+    throw new SecurityQuestionError("用户未设置安全问题");
+  }
+
+  // 验证答案
+  const isMatch = await bcrypt.compare(answer, answerHash);
+  if (!isMatch) {
+    throw new SecurityQuestionError("安全问题答案错误");
+  }
+
+  // 生成重置Token
+  const token = uuidv4();
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString().replace("T", " ").replace(/\.\d+Z$/, "");
+
+  db.run(
+    "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)",
+    [userId, token, expiresAt]
+  );
+
+  saveDatabase();
+
+  return { token };
+}
+
+/** 设置安全问题（需认证） */
+export async function setSecurityQuestion(userId: number, question: string, answer: string): Promise<void> {
+  const db = getDb();
+
+  const answerHash = await bcrypt.hash(answer, BCRYPT_ROUNDS);
+
+  db.run(
+    "UPDATE users SET security_question = ?, security_answer_hash = ?, updated_at = datetime('now') WHERE id = ?",
+    [question, answerHash, userId]
+  );
+
+  saveDatabase();
 }
 
 // ---- 内部辅助函数 ----

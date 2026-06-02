@@ -7,12 +7,10 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Card,
-  CardMedia,
 } from '@mui/material';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import CloseIcon from '@mui/icons-material/Close';
-import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
+import Close from '@mui/icons-material/Close';
+import AddPhotoAlternate from '@mui/icons-material/AddPhotoAlternate';
+import CloudUpload from '@mui/icons-material/CloudUpload';
 import apiClient from '@/api/client';
 import type { ReferenceImageRole } from '@/api/tasks';
 
@@ -41,8 +39,13 @@ interface ImageUploadProps {
 function getAvailableRoles(modelId: string | null, modelType?: 'image' | 'video' | 'text'): { role: ReferenceImageRole; label: string }[] {
   if (!modelId || !modelType) return [];
 
-  // 文案模型不支持参考图
-  if (modelType === 'text') return [];
+  // 文案模型支持参考图（图片反推文案）
+  if (modelType === 'text') {
+    if (modelId === 'deepseek-chat' || modelId === 'qwen-max') {
+      return [{ role: 'reference_image' as ReferenceImageRole, label: '参考图' }];
+    }
+    return [];
+  }
 
   // 图片模型：gpt-image-2 支持编辑源图，nano-banana 和 flux-pro 支持参考图
   if (modelType === 'image') {
@@ -108,9 +111,6 @@ export function ImageUpload({ modelId, modelType, value, onChange }: ImageUpload
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const availableRoles = getAvailableRoles(modelId, modelType);
-
-  // 如果当前模型不支持参考图，不渲染任何内容
-  if (availableRoles.length === 0) return null;
 
   const handleFileSelect = useCallback(
     async (files: FileList | null) => {
@@ -193,6 +193,11 @@ export function ImageUpload({ modelId, modelType, value, onChange }: ImageUpload
     [value, onChange],
   );
 
+  // 当前模型不支持参考图时不渲染
+  if (availableRoles.length === 0) {
+    return null;
+  }
+
   return (
     <Box sx={{ mt: 2 }}>
       <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
@@ -202,7 +207,7 @@ export function ImageUpload({ modelId, modelType, value, onChange }: ImageUpload
       <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         {/* 已上传的图片 */}
         {value.map((img, index) => (
-          <Card
+          <Box
             key={img.url}
             sx={{
               width: 120,
@@ -210,13 +215,16 @@ export function ImageUpload({ modelId, modelType, value, onChange }: ImageUpload
               position: 'relative',
               display: 'flex',
               flexDirection: 'column',
+              borderRadius: 1,
+              overflow: 'hidden',
+              border: '1px solid',
+              borderColor: 'grey.300',
             }}
           >
-            <CardMedia
-              component="img"
-              image={img.previewUrl}
+            <img
+              src={img.previewUrl}
               alt="参考图预览"
-              sx={{ width: 120, height: 90, objectFit: 'cover' }}
+              style={{ width: 120, height: 90, objectFit: 'cover' }}
             />
             <Box sx={{ p: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <FormControl size="small" sx={{ flex: 1, minWidth: 70 }}>
@@ -249,9 +257,9 @@ export function ImageUpload({ modelId, modelType, value, onChange }: ImageUpload
                 height: 22,
               }}
             >
-              <CloseIcon sx={{ fontSize: 14 }} />
+              <Close sx={{ fontSize: 14 }} />
             </IconButton>
-          </Card>
+          </Box>
         ))}
 
         {/* 上传区域 */}
@@ -280,14 +288,14 @@ export function ImageUpload({ modelId, modelType, value, onChange }: ImageUpload
         >
           {uploading ? (
             <>
-              <CloudUploadIcon sx={{ fontSize: 28, color: 'primary.main', mb: 0.5 }} />
+              <CloudUpload sx={{ fontSize: 28, color: 'primary.main', mb: 0.5 }} />
               <Typography variant="caption" color="primary">
                 上传中...
               </Typography>
             </>
           ) : (
             <>
-              <AddPhotoAlternateIcon sx={{ fontSize: 28, color: 'text.secondary', mb: 0.5 }} />
+              <AddPhotoAlternate sx={{ fontSize: 28, color: 'text.secondary', mb: 0.5 }} />
               <Typography variant="caption" color="text.secondary">
                 拖拽或点击上传
               </Typography>

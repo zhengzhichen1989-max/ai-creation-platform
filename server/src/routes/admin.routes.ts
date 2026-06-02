@@ -6,9 +6,12 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 import { adminMiddleware } from "../middleware/admin.middleware.js";
-import { successResponse } from "../utils/helpers.js";
+import { successResponse, paginatedResponse } from "../utils/helpers.js";
 import { getDb, saveDatabase } from "../db/index.js";
 import { nowISO } from "../utils/helpers.js";
+import * as adminUserService from "../services/admin-user.service.js";
+import * as adminOperationLogService from "../services/admin-operation-log.service.js";
+import * as creditsService from "../services/credits.service.js";
 
 // ---- Zod 校验 Schema ----
 
@@ -64,6 +67,48 @@ const modelUpdateSchema = z.object({
   sort_order: z.number().int().optional(),
   duration_options: z.string().optional().nullable(),
   duration_pricing: z.string().optional().nullable(),
+});
+
+// ---- 用户管理 Zod 校验 Schema ----
+
+const userListQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+  search: z.string().optional().default(""),
+  status: z.enum(["active", "disabled", ""]).optional().default(""),
+  role: z.enum(["admin", "user", ""]).optional().default(""),
+});
+
+const userIdSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+const creditTopupSchema = z.object({
+  amount: z.number().int().positive().max(100000, "单次充值上限100,000积分"),
+  description: z.string().min(1).max(200),
+});
+
+const userStatusSchema = z.object({
+  status: z.enum(["active", "disabled"]),
+});
+
+const batchTopupSchema = z.object({
+  userIds: z.array(z.number().int().positive()).min(1).max(50, "单次最多50个用户"),
+  amount: z.number().int().positive().max(100000, "单次充值上限100,000积分"),
+  description: z.string().min(1).max(200),
+});
+
+const operationLogQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+  action: z.string().optional().default(""),
+  adminId: z.coerce.number().int().positive().optional(),
+});
+
+const transactionQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+  type: z.string().optional().default(""),
 });
 
 // ---- 辅助函数 ----
@@ -307,5 +352,96 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     saveDatabase();
 
     reply.send(successResponse(null, "已下架"));
+  });
+
+  // ============================================================
+  // 用户管理 /api/v1/admin/users
+  // ============================================================
+
+  /** GET /users — 用户列表（分页/搜索/筛选） */
+  app.get("/users", async (request, reply) => {
+    const query = userListQuerySchema.parse(request.query);
+    const result = adminUserService.listUsers(query.page, query.pageSize, query.search, query.status, query.role);
+    reply.send(paginatedResponse(result.items, result.total, result.page, result.pageSize));
+  });
+
+  /** GET /users/:id — 用户详情 */
+  app.get("/users/:id", async (request, reply) => {
+    const params = userIdSchema.parse(request.params);
+    const user = adminUserService.getUserDetail(params.id);
+    reply.send(successResponse(user));
+  });
+
+  /** POST /users/:id/credit-topup — 手动充值积分 */
+  app.post("/users/:id/credit-topup", async (request, reply) => {
+    const params = userIdSchema.parse(request.params);
+    const body = creditTopupSchema.parse(request.body);
+
+    // 验证用户存在
+    adminUserService.getUserDetail(params.id);
+
+    const adminId = request.userId!;
+    const adminEmail = request.userEmail!;
+
+    const transaction = creditsService.adminTopup(params.id, body.amount, body.description, adminEmail);
+
+    // 记录操作日志
+    adminOperationLogService.log(adminId, "credit_topup", params.id, {
+      amount: body.amount,
+      description: body.description,
+      adminEmail,
+    });
+
+    reply.send(successResponse(transaction));
+  });
+
+  /** POST /users/:id/reset-password — 生成密码重置链接 */
+  app.post("/users/:id/reset-password", async (request, reply) => {
+    const params = userIdSchema.parse(request.params);
+    const adminId = request.userId!;
+
+    const result = adminUserService.generateResetToken(params.id, adminId);
+    reply.send(successResponse(result));
+  });
+
+  /** GET /users/:id/transactions — 用户积分流水 */
+  app.get("/users/:id/transactions", async (request, reply) => {
+    const params = userIdSchema.parse(request.params);
+    const query = transactionQuerySchema.parse(request.query);
+
+    const type = query.type || undefined;
+    const result = creditsService.getTransactions(params.id, type as any, query.page, query.pageSize);
+    reply.send(paginatedResponse(result.items, result.total, query.page, query.pageSize));
+  });
+
+  /** PUT /users/:id/status — 禁用/启用用户 */
+  app.put("/users/:id/status", async (request, reply) => {
+    const params = userIdSchema.parse(request.params);
+    const body = userStatusSchema.parse(request.body);
+    const adminId = request.userId!;
+
+    const user = adminUserService.updateUserStatus(params.id, body.status, adminId);
+    reply.send(successResponse(user));
+  });
+
+  /** POST /users/batch-credit-topup — 批量充值 */
+  app.post("/users/batch-credit-topup", async (request, reply) => {
+    const body = batchTopupSchema.parse(request.body);
+    const adminId = request.userId!;
+    const adminEmail = request.userEmail!;
+
+    const result = adminUserService.batchTopup(body.userIds, body.amount, body.description, adminId, adminEmail);
+    reply.send(successResponse(result));
+  });
+
+  // ============================================================
+  // 操作日志 /api/v1/admin/operation-logs
+  // ============================================================
+
+  /** GET /operation-logs — 操作日志列表 */
+  app.get("/operation-logs", async (request, reply) => {
+    const query = operationLogQuerySchema.parse(request.query);
+    const result = adminOperationLogService.listLogs(query.page, query.pageSize, query.action, query.adminId);
+    reply.send(paginatedResponse(result.items, result.total, result.page, result.pageSize));
   });
 }

@@ -145,6 +145,60 @@ export async function runMigration(): Promise<void> {
     console.log("[Migration] ai_models.provider 字段已存在，跳过迁移");
   }
 
+  // ============================================================
+  // 管理员用户管理模块迁移
+  // ============================================================
+
+  // 新建 password_reset_tokens 表
+  sqlite.run(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      token TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  console.log("[Migration] password_reset_tokens 表创建完成");
+
+  // 新建 admin_operation_logs 表
+  sqlite.run(`
+    CREATE TABLE IF NOT EXISTS admin_operation_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      admin_id INTEGER NOT NULL REFERENCES users(id),
+      target_user_id INTEGER,
+      action TEXT NOT NULL,
+      detail TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  console.log("[Migration] admin_operation_logs 表创建完成");
+
+  // 为 users 表添加 status 字段
+  try {
+    sqlite.run("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'");
+    console.log("[Migration] 已为 users 表添加 status 字段");
+  } catch {
+    console.log("[Migration] users.status 字段已存在，跳过迁移");
+  }
+
+  // 为 users 表添加 security_question 字段
+  try {
+    sqlite.run("ALTER TABLE users ADD COLUMN security_question TEXT");
+    console.log("[Migration] 已为 users 表添加 security_question 字段");
+  } catch {
+    console.log("[Migration] users.security_question 字段已存在，跳过迁移");
+  }
+
+  // 为 users 表添加 security_answer_hash 字段
+  try {
+    sqlite.run("ALTER TABLE users ADD COLUMN security_answer_hash TEXT");
+    console.log("[Migration] 已为 users 表添加 security_answer_hash 字段");
+  } catch {
+    console.log("[Migration] users.security_answer_hash 字段已存在，跳过迁移");
+  }
+
   // 插入种子数据：管理员账户
   const adminCountResult = sqlite.exec("SELECT COUNT(*) as cnt FROM users WHERE email = ?", ["admin@aicreation.com"]);
   const adminCount = adminCountResult[0]?.values[0]?.[0] as number || 0;

@@ -87,4 +87,31 @@
  * | enabled | INTEGER | NOT NULL, DEFAULT 1 | 是否上架 |
  * | sort_order | INTEGER | DEFAULT 0 | 排序 |
  * | created_at | TEXT | NOT NULL | 创建时间 |
+ *
+ * password_reset_tokens — 密码重置Token表
+ * | 字段 | 类型 | 约束 | 说明 |
+ * |------|------|------|------|
+ * | id | INTEGER | PK, AUTO | Token ID |
+ * | user_id | INTEGER | FK→users.id, NOT NULL | 用户ID |
+ * | token | TEXT | NOT NULL, UNIQUE | 重置Token（UUID v4） |
+ * | expires_at | TEXT | NOT NULL | 过期时间（创建后30分钟） |
+ * | used_at | TEXT | | 使用时间（一次性） |
+ * | created_at | TEXT | NOT NULL, DEFAULT now | 创建时间 |
+ *
+ * admin_operation_logs — 管理员操作日志表
+ * | 字段 | 类型 | 约束 | 说明 |
+ * |------|------|------|------|
+ * | id | INTEGER | PK, AUTO | 日志ID |
+ * | admin_id | INTEGER | FK→users.id, NOT NULL | 操作管理员ID |
+ * | target_user_id | INTEGER | FK→users.id | 目标用户ID（可选） |
+ * | action | TEXT | NOT NULL | 操作类型：credit_topup/batch_topup/reset_password/disable_user/enable_user |
+ * | detail | TEXT | | 操作细节（JSON字符串） |
+ * | created_at | TEXT | NOT NULL, DEFAULT now | 创建时间 |
+ *
+ * users 表新增字段：
+ * | 字段 | 类型 | 约束 | 说明 |
+ * |------|------|------|------|
+ * | status | TEXT | NOT NULL, DEFAULT 'active' | 状态：active/disabled |
+ * | security_question | TEXT | | 安全问题（可选） |
+ * | security_answer_hash | TEXT | | 安全答案哈希（可选） |
  */

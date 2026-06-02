@@ -1,12 +1,12 @@
 // ============================================================
 // AI创作聚合平台 - DMXAPI 文案适配器
-// 支持 deepseek-chat / qwen-max
+// 支持 deepseek-chat / qwen-max（含图片理解/Vision）
 // 使用 POST /v1/chat/completions 端点
 // ============================================================
 
 import fs from "fs";
 import path from "path";
-import type { AdapterResult, GenerateParams, TaskStatusResult } from "../types/index.js";
+import type { AdapterResult, GenerateParams, ReferenceImage, TaskStatusResult } from "../types/index.js";
 import { config } from "../config/index.js";
 
 /** 模型名称别名映射：前端显示名 → DMXAPI实际模型名（按优先级排序） */
@@ -14,6 +14,16 @@ const MODEL_ALIAS_MAP: Record<string, string[]> = {
   "deepseek-chat": ["deepseek-chat", "deepseek-v3", "deepseek-v3.1", "deepseek-v4-flash"],
   "qwen-max": ["qwen-max", "qwen3-max", "qwen-plus"],
 };
+
+/** 将服务器本地路径转为完整公网URL */
+function toFullUrl(localPath: string): string {
+  if (localPath.startsWith("http://") || localPath.startsWith("https://")) {
+    return localPath;
+  }
+  const base = config.publicBaseUrl.replace(/\/+$/, "");
+  const rel = localPath.startsWith("/") ? localPath : `/${localPath}`;
+  return `${base}${rel}`;
+}
 
 /** DMXAPI 文案适配器，支持 deepseek-chat / qwen-max */
 export class DMXAPITextAdapter {
@@ -76,16 +86,51 @@ export class DMXAPITextAdapter {
     throw lastError ?? new Error(`DMXAPI 文案生成所有模型名尝试均失败`);
   }
 
+  /** 构建 OpenAI 兼容的多模态消息内容 */
+  private buildMessageContent(prompt: string, referenceImages?: ReferenceImage[]): unknown {
+    // 无参考图 → 纯文本消息
+    if (!referenceImages || referenceImages.length === 0) {
+      return prompt;
+    }
+
+    // 有参考图 → 多模态消息（OpenAI Vision 格式）
+    const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+
+    // 先添加图片
+    for (const img of referenceImages) {
+      const fullUrl = toFullUrl(img.url);
+      content.push({
+        type: "image_url",
+        image_url: { url: fullUrl },
+      });
+    }
+
+    // 再添加文本提示词
+    content.push({
+      type: "text",
+      text: prompt,
+    });
+
+    return content;
+  }
+
   /** 发起文案生成请求（同步返回） */
   async generate(prompt: string, params?: GenerateParams): Promise<AdapterResult> {
     console.log(`[DMXAPITextAdapter] 发起文案生成: model=${this.modelId}`);
 
+    const referenceImages = params?.referenceImages as ReferenceImage[] | undefined;
+    const messageContent = this.buildMessageContent(prompt, referenceImages);
+
     const body: Omit<Record<string, unknown>, "model"> = {
       messages: [
-        { role: "user", content: prompt },
+        { role: "user", content: messageContent },
       ],
       max_tokens: params?.max_tokens ?? 4096,
     };
+
+    if (referenceImages && referenceImages.length > 0) {
+      console.log(`[DMXAPITextAdapter] 包含 ${referenceImages.length} 张参考图（Vision模式）`);
+    }
 
     const { data, usedModel } = await this.tryWithModelNames(body);
 

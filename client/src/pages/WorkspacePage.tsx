@@ -3,7 +3,8 @@ import { Box, Grid, Paper, Typography, Button, Dialog, DialogTitle, DialogConten
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import { ModelSelector } from '@/components/ModelSelector/ModelSelector';
 import { PromptInput } from '@/components/PromptInput/PromptInput';
-import { ImageUpload, UploadedReferenceImage } from '@/components/ImageUpload/ImageUpload';
+import { ImageUpload } from '@/components/ImageUpload/ImageUpload';
+import type { UploadedReferenceImage } from '@/components/ImageUpload/ImageUpload';
 import { ImageResult } from '@/components/ResultViewer/ImageResult';
 import { VideoResult } from '@/components/ResultViewer/VideoResult';
 import { TextResult } from '@/components/ResultViewer/TextResult';
@@ -11,7 +12,7 @@ import { TaskStatus } from '@/components/ResultViewer/TaskStatus';
 import { useCreateTask, useTaskPolling } from '@/hooks/useTasks';
 import { useBalance } from '@/hooks/useCredits';
 import type { AIModel } from '@/api/models';
-import type { GenerationTask, ReferenceImage } from '@/api/tasks';
+import type { GenerationTask } from '@/api/tasks';
 
 type ActiveTab = 'image' | 'video' | 'text';
 
@@ -62,7 +63,7 @@ export default function WorkspacePage() {
     }
 
     // 构建参考图数据（只传 url 和 role）
-    const refImages: ReferenceImage[] | undefined = referenceImages.length > 0
+    const refImages = referenceImages.length > 0
       ? referenceImages.map(img => ({ url: img.url, role: img.role }))
       : undefined;
 

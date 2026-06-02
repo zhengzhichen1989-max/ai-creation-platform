@@ -103,6 +103,38 @@ export class OptimisticLockError extends AppError {
   }
 }
 
+/** 用户不存在 */
+export class UserNotFoundError extends AppError {
+  constructor(userId?: number | string) {
+    super(userId ? `用户不存在: ${userId}` : "用户不存在", 4041, 404);
+    this.name = "UserNotFoundError";
+  }
+}
+
+/** 用户已被禁用 */
+export class UserDisabledError extends AppError {
+  constructor(message: string = "账户已被禁用") {
+    super(message, 4012, 401);
+    this.name = "UserDisabledError";
+  }
+}
+
+/** 密码重置Token无效或过期 */
+export class InvalidResetTokenError extends AppError {
+  constructor(message: string = "重置链接无效或已过期") {
+    super(message, 4011, 401);
+    this.name = "InvalidResetTokenError";
+  }
+}
+
+/** 安全问题验证失败 */
+export class SecurityQuestionError extends AppError {
+  constructor(message: string = "安全问题答案错误") {
+    super(message, 4013, 401);
+    this.name = "SecurityQuestionError";
+  }
+}
+
 /** 判断是否为自定义应用错误 */
 export function isAppError(error: unknown): error is AppError {
   return error instanceof AppError;

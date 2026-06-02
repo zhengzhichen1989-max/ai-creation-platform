@@ -1,0 +1,128 @@
+# 管理员用户管理模块 - 类图
+
+```mermaid
+classDiagram
+    direction LR
+
+    class AdminUserService {
+        +listUsers(page: number, pageSize: number, search: string, status: string, role: string) PaginatedData~AdminUserListItem~
+        +getUserDetail(userId: number) AdminUserDetail
+        +updateUserStatus(userId: number, status: string, adminId: number) AdminUserDetail
+        +generateResetToken(userId: number, adminId: number) PasswordResetTokenInfo
+        +batchTopup(userIds: number[], amount: number, description: string, adminId: number) BatchTopupResult
+    }
+
+    class AdminOperationLogService {
+        +log(adminId: number, action: AdminAction, targetUserId: number, detail: object) void
+        +listLogs(page: number, pageSize: number, action: string, adminId: number) PaginatedData~AdminOperationLog~
+    }
+
+    class CreditsService {
+        +getBalance(userId: number) CreditsBalance
+        +deduct(userId: number, amount: number, referenceId: string, description: string) CreditTransactionInfo
+        +topUp(userId: number, amount: number, referenceId: string, description: string) CreditTransactionInfo
+        +refund(userId: number, amount: number, referenceId: string, description: string) CreditTransactionInfo
+        +adminTopup(userId: number, amount: number, description: string, adminId: number) CreditTransactionInfo
+        +getTransactions(userId: number, type: TransactionType, page: number, pageSize: number) PaginatedData~CreditTransactionInfo~
+    }
+
+    class AuthService {
+        +register(email: string, password: string, nickname: string) AuthResult
+        +login(email: string, password: string) AuthResult
+        +refreshTokens(refreshToken: string) RefreshResult
+        +getUserById(userId: number) UserInfo
+        +resetPassword(token: string, newPassword: string) void
+        +forgotPassword(email: string) ForgotPasswordResult
+        +verifySecurityAnswer(email: string, answer: string) VerifyAnswerResult
+    }
+
+    class AuthMiddleware {
+        +authMiddleware(request: FastifyRequest, reply: FastifyReply) void
+    }
+
+    class AdminMiddleware {
+        +adminMiddleware(request: FastifyRequest, reply: FastifyReply) void
+    }
+
+    class AdminUserRoutes {
+        +GET /admin/users
+        +GET /admin/users/:id
+        +POST /admin/users/:id/credit-topup
+        +POST /admin/users/:id/reset-password
+        +GET /admin/users/:id/transactions
+        +PUT /admin/users/:id/status
+        +POST /admin/users/batch-credit-topup
+        +GET /admin/operation-logs
+    }
+
+    class AuthRoutes {
+        +POST /auth/reset-password
+        +POST /auth/forgot-password
+        +POST /auth/verify-security-answer
+        +PUT /auth/security-question
+    }
+
+    class AdminUserListItem {
+        +id: number
+        +email: string
+        +nickname: string
+        +avatarUrl: string|null
+        +role: string
+        +status: string
+        +creditBalance: number
+        +createdAt: string
+    }
+
+    class AdminUserDetail {
+        +id: number
+        +email: string
+        +nickname: string
+        +avatarUrl: string|null
+        +role: string
+        +status: string
+        +securityQuestion: string|null
+        +creditBalance: number
+        +creditVersion: number
+        +createdAt: string
+        +updatedAt: string
+    }
+
+    class PasswordResetTokenInfo {
+        +id: number
+        +userId: number
+        +token: string
+        +expiresAt: string
+        +usedAt: string|null
+        +createdAt: string
+    }
+
+    class AdminOperationLog {
+        +id: number
+        +adminId: number
+        +adminEmail: string
+        +targetUserId: number|null
+        +action: string
+        +detail: string|null
+        +createdAt: string
+    }
+
+    class BatchTopupResult {
+        +successCount: number
+        +failCount: number
+    }
+
+    class ForgotPasswordResult {
+        +hasSecurityQuestion: boolean
+        +question: string|null
+    }
+
+    AdminUserRoutes --> AdminUserService : calls
+    AdminUserRoutes --> CreditsService : calls
+    AdminUserRoutes --> AdminOperationLogService : calls
+    AuthRoutes --> AuthService : calls
+    AdminUserRoutes --> AuthMiddleware : preHandler
+    AdminUserRoutes --> AdminMiddleware : preHandler
+    AuthService --> CreditsService : uses
+    AdminUserService --> AdminOperationLogService : uses
+    AuthMiddleware ..> AdminUserService : reads status
+```

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>诊断页面</title>
+</head>
+<body>
+<h2>网站诊断中...</h2>
+<div id="result"></div>
+<script>
+const result = document.getElementById('result');
+const logs = [];
+
+async function diagnose() {
+  // Test 1: 加载主页面
+  try {
+    const res = await fetch('http://47.106.208.53/workspace');
+    const html = await res.text();
+    logs.push(`✅ 页面加载: HTTP ${res.status}, ${html.length} bytes`);
+    logs.push(`  HTML包含root div: ${html.includes('id="root"')}`);
+    logs.push(`  HTML包含JS引用: ${html.includes('index-')}`);
+  } catch (e) {
+    logs.push(`❌ 页面加载失败: ${e.message}`);
+  }
+
+  // Test 2: 加载JS文件
+  try {
+    const res = await fetch('http://47.106.208.53/assets/index-CJNysIJg.js');
+    const text = await res.text();
+    logs.push(`✅ JS文件加载: HTTP ${res.status}, ${text.length} bytes`);
+    logs.push(`  Content-Type: ${res.headers.get('content-type')}`);
+
+    // 检查关键函数/组件是否存在
+    logs.push(`  包含WorkspacePage: ${text.includes('WorkspacePage')}`);
+    logs.push(`  包含ImageUpload: ${text.includes('ImageUpload')}`);
+    logs.push(`  包含ProtectedRoute: ${text.includes('ProtectedRoute')}`);
+    logs.push(`  包含React: ${text.includes('react')}`);
+  } catch (e) {
+    logs.push(`❌ JS文件加载失败: ${e.message}`);
+  }
+
+  // Test 3: 加载CSS
+  try {
+    const res = await fetch('http://47.106.208.53/assets/index-BQ7AOB7W.css');
+    logs.push(`✅ CSS文件加载: HTTP ${res.status}, ${(await res.text()).length} bytes`);
+  } catch (e) {
+    logs.push(`❌ CSS文件加载失败: ${e.message}`);
+  }
+
+  // Test 4: API测试
+  try {
+    const res = await fetch('http://47.106.208.53/api/v1/models');
+    const data = await res.json();
+    logs.push(`✅ Models API: HTTP ${res.status}, ${JSON.stringify(data).length} bytes`);
+    if (data.data) {
+      logs.push(`  模型数量: ${data.data.length}`);
+      data.data.forEach(m => logs.push(`  - ${m.id}: ${m.name} (${m.type})`));
+    }
+  } catch (e) {
+    logs.push(`❌ Models API失败: ${e.message}`);
+  }
+
+  // Test 5: 登录测试
+  try {
+    const res = await fetch('http://47.106.208.53/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@aicreation.com', password: 'admin123' })
+    });
+    const data = await res.json();
+    logs.push(`✅ 登录API: HTTP ${res.status}`);
+    if (data.data?.accessToken) {
+      logs.push(`  Token获取成功`);
+
+      // Test 6: 用token访问tasks
+      const res2 = await fetch('http://47.106.208.53/api/v1/tasks?page=1&pageSize=10', {
+        headers: { 'Authorization': `Bearer ${data.data.accessToken}` }
+      });
+      logs.push(`✅ Tasks API: HTTP ${res2.status}`);
+    }
+  } catch (e) {
+    logs.push(`❌ 登录API失败: ${e.message}`);
+  }
+
+  // Test 7: 在iframe中加载实际页面，看是否有错误
+  logs.push(`\n--- 在iframe中测试实际页面渲染 ---`);
+  const iframe = document.createElement('iframe');
+  iframe.src = 'http://47.106.208.53/workspace';
+  iframe.style.width = '100%';
+  iframe.style.height = '600px';
+  iframe.style.border = '1px solid #ccc';
+
+  iframe.onerror = (e) => logs.push(`❌ iframe加载错误: ${e}`);
+
+  document.body.appendChild(iframe);
+
+  result.innerHTML = logs.map(l => `<div>${l}</div>`).join('');
+}
+
+diagnose();
+</script>
+</body>
+</html>

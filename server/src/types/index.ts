@@ -56,7 +56,7 @@ export type ModelCategory = "starter" | "standard" | "advanced" | "flagship";
 export type TaskStatus = "pending" | "processing" | "completed" | "failed" | "cancelled";
 
 /** 流水类型 */
-export type TransactionType = "purchase" | "consume" | "refund";
+export type TransactionType = "purchase" | "consume" | "refund" | "admin_topup";
 
 /** 参考图类型 */
 export type ReferenceImageRole = "first_frame" | "last_frame" | "reference_image" | "edit_source";
@@ -221,4 +221,74 @@ export interface ModelListItem {
   config: string | null;
   durationOptions: number[] | null;
   durationPricing: Record<string, number> | null;
+}
+
+// ---- 管理员用户管理类型 ----
+
+/** 管理员用户列表项 */
+export interface AdminUserListItem {
+  id: number;
+  email: string;
+  nickname: string;
+  avatarUrl: string | null;
+  role: string;
+  status: string;
+  creditBalance: number;
+  createdAt: string;
+}
+
+/** 管理员用户详情 */
+export interface AdminUserDetail {
+  id: number;
+  email: string;
+  nickname: string;
+  avatarUrl: string | null;
+  role: string;
+  status: string;
+  securityQuestion: string | null;
+  creditBalance: number;
+  creditVersion: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 密码重置Token信息 */
+export interface PasswordResetTokenInfo {
+  id: number;
+  userId: number;
+  token: string;
+  expiresAt: string;
+  usedAt: string | null;
+  createdAt: string;
+}
+
+/** 管理员操作日志 */
+export interface AdminOperationLog {
+  id: number;
+  adminId: number;
+  adminEmail: string;
+  targetUserId: number | null;
+  action: string;
+  detail: string | null;
+  createdAt: string;
+}
+
+/** 管理员操作类型 */
+export type AdminAction =
+  | "credit_topup"
+  | "batch_topup"
+  | "reset_password"
+  | "disable_user"
+  | "enable_user";
+
+/** 批量充值结果 */
+export interface BatchTopupResult {
+  successCount: number;
+  failCount: number;
+}
+
+/** 忘记密码结果 */
+export interface ForgotPasswordResult {
+  hasSecurityQuestion: boolean;
+  question: string | null;
 }

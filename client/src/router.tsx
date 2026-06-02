@@ -8,6 +8,8 @@ import HistoryPage from '@/pages/HistoryPage';
 import CreditsPage from '@/pages/CreditsPage';
 import ProfilePage from '@/pages/ProfilePage';
 import AdminPage from '@/pages/AdminPage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import type { ReactNode } from 'react';
 
 /** Route guard that redirects unauthenticated users to login */
@@ -56,6 +58,14 @@ export default function AppRouter() {
             <RegisterPage />
           </PublicRoute>
         }
+      />
+      <Route
+        path="/reset-password"
+        element={<ResetPasswordPage />}
+      />
+      <Route
+        path="/forgot-password"
+        element={<ForgotPasswordPage />}
       />
 
       {/* Protected routes inside AppLayout */}

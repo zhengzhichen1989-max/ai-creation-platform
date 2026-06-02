@@ -16,7 +16,7 @@ const adapterMap: Record<string, (modelId: string) => DMXAPITextAdapter> = {
 
 /** 文案生成处理器 */
 export const textProcessor: QueueProcessor = async (job: QueueJobData): Promise<void> => {
-  const { taskId, modelId, prompt, params } = job;
+  const { taskId, modelId, prompt, params, referenceImages } = job;
 
   console.log(`[TextWorker] 开始处理任务: ${taskId}, 模型: ${modelId}`);
 
@@ -34,6 +34,10 @@ export const textProcessor: QueueProcessor = async (job: QueueJobData): Promise<
     // 3. 调用适配器生成（文案是同步返回的）
     taskService.updateTaskStatus(taskId, "processing", { progress: 50 });
     const generateParams: GenerateParams = params ? JSON.parse(params) : {};
+    // 将参考图注入生成参数
+    if (referenceImages && referenceImages.length > 0) {
+      generateParams.referenceImages = referenceImages;
+    }
     const result = await adapter.generate(prompt, generateParams);
 
     // 4. 文案生成是同步的，直接处理结果
