@@ -16,9 +16,10 @@ export const MODEL_PROVIDER_MAP: Record<string, ModelProviderConfig> = {
   'nano-banana-pro': { provider: 'grsai', endpoint: '/v1/draw/nano-banana', method: 'POST' },
   'nano-banana-fast': { provider: 'grsai', endpoint: '/v1/draw/nano-banana', method: 'POST' },
   'flux-pro': { provider: 'grsai', endpoint: '/v1/draw/completions', method: 'POST' },
-  // DMXAPI 视频模型 (baseUrl 已含 /v1，统一使用 /responses 端点)
+  // DMXAPI 视频模型 (baseUrl 已含 /v1，seedance/kling 使用 /responses 端点，sora 使用 /videos)
+  'doubao-seedance-2-0-260128': { provider: 'dmxapi', endpoint: '/responses', method: 'POST' },
   'doubao-seedance-2-0-fast-260128': { provider: 'dmxapi', endpoint: '/responses', method: 'POST' },
-  'sora-2': { provider: 'dmxapi', endpoint: '/responses', method: 'POST' },
+  'sora-2': { provider: 'dmxapi', endpoint: '/videos', method: 'POST' },
   'kling-v3-video-generation': { provider: 'dmxapi', endpoint: '/responses', method: 'POST' },
   // DMXAPI 文案模型
   'deepseek-chat': { provider: 'dmxapi', endpoint: '/chat/completions', method: 'POST' },

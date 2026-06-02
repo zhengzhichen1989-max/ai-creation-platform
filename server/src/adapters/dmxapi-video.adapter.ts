@@ -10,7 +10,7 @@ import path from "path";
 import type { AdapterResult, GenerateParams, TaskStatusResult } from "../types/index.js";
 import { config } from "../config/index.js";
 
-/** DMXAPI 视频适配器，支持 sora-2 / doubao-seedance-2-0-fast-260128 / kling-v3-video-generation */
+/** DMXAPI 视频适配器，支持 sora-2 / doubao-seedance-2-0-260128 / doubao-seedance-2-0-fast-260128 / kling-v3-video-generation */
 export class DMXAPIVideoAdapter {
   private modelId: string;
   private baseUrl: string;    // https://www.dmxapi.cn/v1
@@ -52,7 +52,7 @@ export class DMXAPIVideoAdapter {
     return "";
   }
 
-  /** 构建 Seedance 2.0 提交请求体 (input是数组格式) */
+  /** 构建 Seedance 2.0 提交请求体 (input是数组格式，标准版和Fast版共用) */
   private buildSeedanceBody(prompt: string, params?: GenerateParams): Record<string, unknown> {
     const duration = params?.duration ?? 5;
     const clampedDuration = Math.max(4, Math.min(15, duration));
@@ -66,7 +66,7 @@ export class DMXAPIVideoAdapter {
     }
 
     return {
-      model: "doubao-seedance-2-0-fast-260128",
+      model: this.modelId,  // 使用实际传入的 modelId（标准版或Fast版）
       input: [{ type: "text", text: prompt }],
       duration: clampedDuration,
       ratio,
@@ -152,6 +152,7 @@ export class DMXAPIVideoAdapter {
       case "sora-2":
         return "sora-get";
       case "doubao-seedance-2-0-fast-260128":
+      case "doubao-seedance-2-0-260128":
         return "seedance-2-0-get";
       case "kling-v3-video-generation":
         return "kling-v3-get";
@@ -173,6 +174,7 @@ export class DMXAPIVideoAdapter {
     let body: Record<string, unknown>;
     switch (this.modelId) {
       case "doubao-seedance-2-0-fast-260128":
+      case "doubao-seedance-2-0-260128":
         body = this.buildSeedanceBody(prompt, params);
         break;
       case "kling-v3-video-generation":

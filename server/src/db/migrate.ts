@@ -170,12 +170,13 @@ export async function runMigration(): Promise<void> {
     { id: "nano-banana-fast", name: "Nano Banana Fast", type: "image", category: "starter", cost_credits: 1, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 3, duration_options: null, duration_pricing: null, provider: "grsai" },
     { id: "flux-pro", name: "Flux Pro", type: "image", category: "standard", cost_credits: 4, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 4, duration_options: null, duration_pricing: null, provider: "grsai" },
     // DMXAPI 视频模型（id使用真实模型ID，name保持前端友好显示名）
-    { id: "doubao-seedance-2-0-fast-260128", name: "Seedance 2.0", type: "video", category: "advanced", cost_credits: 20, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 5, duration_options: "[5,10,15]", duration_pricing: '{"5":20,"10":35,"15":50}', provider: "dmxapi" },
-    { id: "sora-2", name: "Sora 2", type: "video", category: "flagship", cost_credits: 30, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 4, defaultFps: 24 }), sort_order: 6, duration_options: "[4,8,12]", duration_pricing: '{"4":20,"8":30,"12":45}', provider: "dmxapi" },
-    { id: "kling-v3-video-generation", name: "可灵 Kling 3.0", type: "video", category: "standard", cost_credits: 15, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 7, duration_options: "[5,10]", duration_pricing: '{"5":15,"10":25}', provider: "dmxapi" },
+    { id: "doubao-seedance-2-0-260128", name: "Seedance 2.0", type: "video", category: "flagship", cost_credits: 25, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 5, duration_options: "[5,10,15]", duration_pricing: '{"5":25,"10":45,"15":65}', provider: "dmxapi" },
+    { id: "doubao-seedance-2-0-fast-260128", name: "Seedance 2.0 Fast", type: "video", category: "advanced", cost_credits: 15, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 6, duration_options: "[5,10]", duration_pricing: '{"5":15,"10":25}', provider: "dmxapi" },
+    { id: "sora-2", name: "Sora 2", type: "video", category: "flagship", cost_credits: 30, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 4, defaultFps: 24 }), sort_order: 7, duration_options: "[4,8,12]", duration_pricing: '{"4":20,"8":30,"12":45}', provider: "dmxapi" },
+    { id: "kling-v3-video-generation", name: "可灵 Kling 3.0", type: "video", category: "standard", cost_credits: 15, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 8, duration_options: "[5,10]", duration_pricing: '{"5":15,"10":25}', provider: "dmxapi" },
     // DMXAPI 文案模型（id使用真实模型ID，name保持前端友好显示名）
-    { id: "deepseek-chat", name: "DeepSeek V4", type: "text", category: "starter", cost_credits: 2, adapter_class: "DMXAPITextAdapter", enabled: 1, config: null, sort_order: 8, duration_options: null, duration_pricing: null, provider: "dmxapi" },
-    { id: "qwen-max", name: "Qwen3-Max", type: "text", category: "standard", cost_credits: 3, adapter_class: "DMXAPITextAdapter", enabled: 1, config: null, sort_order: 9, duration_options: null, duration_pricing: null, provider: "dmxapi" },
+    { id: "deepseek-chat", name: "DeepSeek V4", type: "text", category: "starter", cost_credits: 2, adapter_class: "DMXAPITextAdapter", enabled: 1, config: null, sort_order: 9, duration_options: null, duration_pricing: null, provider: "dmxapi" },
+    { id: "qwen-max", name: "Qwen3-Max", type: "text", category: "standard", cost_credits: 3, adapter_class: "DMXAPITextAdapter", enabled: 1, config: null, sort_order: 10, duration_options: null, duration_pricing: null, provider: "dmxapi" },
   ];
 
   for (const m of models) {
@@ -184,7 +185,7 @@ export async function runMigration(): Promise<void> {
       [m.id, m.name, m.type, m.category, m.cost_credits, m.adapter_class, m.enabled, m.config, m.sort_order, m.duration_options, m.duration_pricing, m.provider]
     );
   }
-  console.log("[Migration] AI模型种子数据插入完成（9条）");
+  console.log("[Migration] AI模型种子数据插入完成（10条）");
 
   // 插入种子数据：积分包
   const packageCountResult = sqlite.exec("SELECT COUNT(*) as cnt FROM credit_packages");
