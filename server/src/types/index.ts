@@ -58,6 +58,15 @@ export type TaskStatus = "pending" | "processing" | "completed" | "failed" | "ca
 /** 流水类型 */
 export type TransactionType = "purchase" | "consume" | "refund";
 
+/** 参考图类型 */
+export type ReferenceImageRole = "first_frame" | "last_frame" | "reference_image" | "edit_source";
+
+/** 参考图信息 */
+export interface ReferenceImage {
+  url: string;        // 图片URL（服务器本地路径）
+  role: ReferenceImageRole;
+}
+
 /** 生成参数 */
 export interface GenerateParams {
   width?: number;
@@ -67,6 +76,7 @@ export interface GenerateParams {
   duration?: number;
   fps?: number;
   max_tokens?: number;
+  referenceImages?: ReferenceImage[];
   [key: string]: unknown;
 }
 
@@ -130,6 +140,8 @@ export interface CreateTaskRequest {
   modelId: string;
   prompt: string;
   params?: GenerateParams;
+  duration?: number;
+  referenceImages?: ReferenceImage[];
 }
 
 /** 积分购买请求 */

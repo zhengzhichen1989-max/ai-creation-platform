@@ -27,6 +27,11 @@ async function main() {
   if (!fs.existsSync(config.uploadDir)) {
     fs.mkdirSync(config.uploadDir, { recursive: true });
   }
+  // 确保参考图目录存在
+  const refImagesDir = path.join(config.uploadDir, "ref_images");
+  if (!fs.existsSync(refImagesDir)) {
+    fs.mkdirSync(refImagesDir, { recursive: true });
+  }
 
   // 2. 初始化数据库
   console.log("[Init] 初始化数据库...");

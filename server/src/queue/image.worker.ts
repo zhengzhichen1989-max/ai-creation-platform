@@ -6,7 +6,7 @@ import { GrsAIImageAdapter } from "../adapters/grsai-image.adapter.js";
 import type { QueueJobData, QueueProcessor } from "./index.js";
 import * as taskService from "../services/task.service.js";
 import * as creditsService from "../services/credits.service.js";
-import type { GenerateParams, AdapterResult, TaskStatusResult } from "../types/index.js";
+import type { GenerateParams, AdapterResult, TaskStatusResult, ReferenceImage } from "../types/index.js";
 
 /** 适配器注册表：按模型ID路由到对应适配器 */
 const adapterMap: Record<string, (modelId: string) => GrsAIImageAdapter> = {
@@ -18,9 +18,9 @@ const adapterMap: Record<string, (modelId: string) => GrsAIImageAdapter> = {
 
 /** 图片生成处理器 */
 export const imageProcessor: QueueProcessor = async (job: QueueJobData): Promise<void> => {
-  const { taskId, modelId, prompt, params } = job;
+  const { taskId, modelId, prompt, params, referenceImages } = job;
 
-  console.log(`[ImageWorker] 开始处理任务: ${taskId}, 模型: ${modelId}`);
+  console.log(`[ImageWorker] 开始处理任务: ${taskId}, 模型: ${modelId}, 参考图: ${referenceImages?.length ?? 0}`);
 
   try {
     // 1. 更新任务状态为 processing
@@ -33,9 +33,12 @@ export const imageProcessor: QueueProcessor = async (job: QueueJobData): Promise
     }
     const adapter = adapterFactory(modelId);
 
-    // 3. 调用适配器生成
+    // 3. 调用适配器生成（将 referenceImages 注入 params）
     taskService.updateTaskStatus(taskId, "processing", { progress: 30 });
     const generateParams: GenerateParams = params ? JSON.parse(params) : {};
+    if (referenceImages && referenceImages.length > 0) {
+      generateParams.referenceImages = referenceImages;
+    }
     const result = await adapter.generate(prompt, generateParams);
 
     // 4. GrsAI图片生成是异步的，需要轮询

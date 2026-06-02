@@ -2,7 +2,7 @@
 // AI创作聚合平台 - 队列初始化（BullMQ + 内存回退）
 // ============================================================
 
-import type { GenerationTaskInfo } from "../types/index.js";
+import type { GenerationTaskInfo, ReferenceImage } from "../types/index.js";
 import { config } from "../config/index.js";
 
 /** 队列任务数据 */
@@ -13,6 +13,7 @@ export interface QueueJobData {
   prompt: string;
   type: "image" | "video" | "text";
   params?: string;
+  referenceImages?: ReferenceImage[];
 }
 
 /** 内存队列任务 */

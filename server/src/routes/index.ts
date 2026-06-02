@@ -9,6 +9,7 @@ import { tasksRoutes } from "./tasks.routes.js";
 import { creditsRoutes } from "./credits.routes.js";
 import { generationsRoutes } from "./generations.routes.js";
 import { adminRoutes } from "./admin.routes.js";
+import { uploadRoutes } from "./upload.routes.js";
 
 /** 注册所有路由 */
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
@@ -18,4 +19,5 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.register(creditsRoutes, { prefix: "/api/v1/credits" });
   app.register(generationsRoutes, { prefix: "/api/v1/generations" });
   app.register(adminRoutes, { prefix: "/api/v1/admin" });
+  app.register(uploadRoutes, { prefix: "/api/v1/upload" });
 }

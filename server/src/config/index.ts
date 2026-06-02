@@ -53,6 +53,9 @@ export const config = {
   /** 上传目录 */
   uploadDir: process.env.UPLOAD_DIR || path.resolve(__dirname, "../../uploads"),
 
+  /** 公网基础URL（用于将本地路径转为完整URL） */
+  publicBaseUrl: process.env.PUBLIC_BASE_URL || "http://localhost:3000",
+
   /** 是否为开发环境 */
   get isDev(): boolean {
     return this.nodeEnv === "development";
@@ -68,6 +71,11 @@ export function ensureDirectories(): void {
     }
     if (!fs.existsSync(config.uploadDir)) {
       fs.mkdirSync(config.uploadDir, { recursive: true });
+    }
+    // 确保参考图目录存在
+    const refImagesDir = path.join(config.uploadDir, "ref_images");
+    if (!fs.existsSync(refImagesDir)) {
+      fs.mkdirSync(refImagesDir, { recursive: true });
     }
   });
 }

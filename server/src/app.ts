@@ -4,9 +4,16 @@
 
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import multipart from "@fastify/multipart";
+import fastifyStatic from "@fastify/static";
 import { registerRoutes } from "./routes/index.js";
 import { errorHandler } from "./middleware/error.middleware.js";
 import { config } from "./config/index.js";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /** 创建 Fastify 应用实例 */
 export async function buildApp() {
@@ -22,6 +29,21 @@ export async function buildApp() {
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
+  });
+
+  // 注册 multipart 插件（用于图片上传）
+  await app.register(multipart, {
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB
+    },
+  });
+
+  // 注册静态文件服务（/uploads 目录）
+  const uploadsDir = config.uploadDir;
+  await app.register(fastifyStatic, {
+    root: uploadsDir,
+    prefix: "/uploads/",
+    decorateReply: false,
   });
 
   // 注册路由

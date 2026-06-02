@@ -8,13 +8,17 @@ import * as taskService from "../services/task.service.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 import { successResponse, paginatedResponse } from "../utils/helpers.js";
 import { addImageJob, addVideoJob, addTextJob } from "../queue/index.js";
-import type { ModelType, TaskStatus, GenerateParams } from "../types/index.js";
+import type { ModelType, TaskStatus, GenerateParams, ReferenceImage } from "../types/index.js";
 
 const createTaskSchema = z.object({
   modelId: z.string().min(1, "模型ID不能为空"),
   prompt: z.string().min(1, "提示词不能为空").max(2000, "提示词最多2000个字符"),
   params: z.record(z.unknown()).optional(),
   duration: z.number().int().positive().optional(),
+  referenceImages: z.array(z.object({
+    url: z.string().min(1),
+    role: z.enum(["first_frame", "last_frame", "reference_image", "edit_source"]),
+  })).optional(),
 });
 
 export async function tasksRoutes(app: FastifyInstance): Promise<void> {
@@ -27,6 +31,12 @@ export async function tasksRoutes(app: FastifyInstance): Promise<void> {
     const duration = body.duration;
     const task = taskService.createTask(userId, body.modelId, body.prompt, body.params as GenerateParams, duration);
 
+    // 构建参考图数据
+    const referenceImages: ReferenceImage[] | undefined = body.referenceImages?.map(img => ({
+      url: img.url,
+      role: img.role as ReferenceImage["role"],
+    }));
+
     // 根据类型推入对应队列
     if (task.type === "image") {
       await addImageJob({
@@ -36,6 +46,7 @@ export async function tasksRoutes(app: FastifyInstance): Promise<void> {
         prompt: task.prompt,
         type: "image",
         params: task.params ?? undefined,
+        referenceImages,
       });
     } else if (task.type === "video") {
       await addVideoJob({
@@ -45,6 +56,7 @@ export async function tasksRoutes(app: FastifyInstance): Promise<void> {
         prompt: task.prompt,
         type: "video",
         params: task.params ?? undefined,
+        referenceImages,
       });
     } else if (task.type === "text") {
       await addTextJob({
@@ -54,6 +66,7 @@ export async function tasksRoutes(app: FastifyInstance): Promise<void> {
         prompt: task.prompt,
         type: "text",
         params: task.params ?? undefined,
+        referenceImages,
       });
     }
 

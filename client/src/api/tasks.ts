@@ -3,6 +3,13 @@ import type { ApiResponse } from './auth';
 
 export type TaskStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
 export type TaskType = 'image' | 'video' | 'text';
+export type ReferenceImageRole = 'first_frame' | 'last_frame' | 'reference_image' | 'edit_source';
+
+/** 参考图信息 */
+export interface ReferenceImage {
+  url: string;
+  role: ReferenceImageRole;
+}
 
 export interface GenerationTask {
   id: string;
@@ -27,6 +34,7 @@ export interface CreateTaskParams {
   prompt: string;
   params?: Record<string, unknown>;
   duration?: number;
+  referenceImages?: ReferenceImage[];
 }
 
 export interface CreateTaskResult {
@@ -71,4 +79,17 @@ export async function listTasks(params?: TaskListParams): Promise<TaskListResult
 /** Cancel a running task */
 export async function cancelTask(taskId: string): Promise<void> {
   await apiClient.post(`/tasks/${taskId}/cancel`);
+}
+
+/** Upload a reference image */
+export async function uploadReferenceImage(file: File): Promise<{ url: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await apiClient.post<ApiResponse<{ url: string }>>('/upload/image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000,
+  });
+
+  return res.data.data;
 }

@@ -1,13 +1,14 @@
 // ============================================================
 // AI创作聚合平台 - GrsAI 图片适配器
 // SSE 流式响应，等待最终结果直接返回
+// 支持图生图（gpt-image-2）通过 /v1/images/edits 端点
 // ============================================================
 
-import type { AdapterResult, GenerateParams } from "../types/index.js";
+import type { AdapterResult, GenerateParams, ReferenceImage } from "../types/index.js";
 import { config } from "../config/index.js";
 import { MODEL_PROVIDER_MAP } from "../config/providers.js";
 
-/** GrsAI 图片适配器，支持 /v1/draw/completions 和 /v1/draw/nano-banana 两种端点 */
+/** GrsAI 图片适配器，支持 /v1/draw/completions 和 /v1/draw/nano-banana 两种端点，以及 /v1/images/edits 图生图端点 */
 export class GrsAIImageAdapter {
   private modelId: string;
   private baseUrl: string;
@@ -21,10 +22,30 @@ export class GrsAIImageAdapter {
 
   /**
    * 发起图片生成请求
-   * GrsAI返回SSE流，整个流包含从running→succeeded的完整过程
-   * 我们等待到succeeded状态，直接返回结果URL
+   * 如果 referenceImages 包含 edit_source 角色，走 edit（图生图）流程
+   * 如果 referenceImages 包含 reference_image 角色（nano-banana/flux-pro 参考图），
+   *   将参考图传入 textToImage 通过 urls 参数发送
+   * 否则走原 generate 流程
    */
   async generate(prompt: string, params?: GenerateParams): Promise<AdapterResult> {
+    const referenceImages = params?.referenceImages as ReferenceImage[] | undefined;
+    const editSource = referenceImages?.find(img => img.role === "edit_source");
+
+    if (editSource) {
+      return this.edit(editSource.url, prompt, params);
+    }
+
+    // 提取 reference_image 角色的参考图（nano-banana/flux-pro 图生图）
+    const refImages = referenceImages?.filter(img => img.role === "reference_image") ?? [];
+
+    return this.textToImage(prompt, params, refImages.length > 0 ? refImages : undefined);
+  }
+
+  /**
+   * 文生图：标准生成流程
+   * @param referenceImages 参考图列表（nano-banana/flux-pro 图生图），将图片URL转为完整URL后加入 body.urls
+   */
+  private async textToImage(prompt: string, params?: GenerateParams, referenceImages?: ReferenceImage[]): Promise<AdapterResult> {
     const providerConfig = MODEL_PROVIDER_MAP[this.modelId];
     if (!providerConfig) {
       throw new Error(`未找到模型 ${this.modelId} 的 provider 配置`);
@@ -40,6 +61,13 @@ export class GrsAIImageAdapter {
       prompt,
       size,
     };
+
+    // 如果有参考图，将URL转为完整URL后加入 body.urls
+    if (referenceImages && referenceImages.length > 0) {
+      const urls = referenceImages.map(img => this.toFullUrl(img.url));
+      body.urls = urls;
+      console.log(`[GrsAIImageAdapter] 参考图数量: ${urls.length}, 模型: ${this.modelId}`);
+    }
 
     console.log(`[GrsAIImageAdapter] 发起图片生成: model=${this.modelId}, endpoint=${providerConfig.endpoint}`);
 
@@ -60,6 +88,63 @@ export class GrsAIImageAdapter {
 
     // 解析 SSE 响应，等待最终结果
     return this.parseSSEResponse(response);
+  }
+
+  /**
+   * 图生图：使用 /v1/images/edits 端点（gpt-image-2 only）
+   * 请求体:
+   * {
+   *   "model": "gpt-image-2",
+   *   "image": imageUrl,  // URL或Base64
+   *   "prompt": "编辑描述",
+   *   "size": "1024x1024"
+   * }
+   */
+  async edit(imageUrl: string, prompt: string, params?: GenerateParams): Promise<AdapterResult> {
+    const url = `${this.baseUrl}/v1/images/edits`;
+    const size = params?.width && params?.height
+      ? `${params.width}x${params.height}`
+      : "1024x1024";
+
+    // 将本地路径转为完整URL
+    const fullImageUrl = this.toFullUrl(imageUrl);
+
+    const body: Record<string, unknown> = {
+      model: "gpt-image-2",
+      image: fullImageUrl,
+      prompt,
+      size,
+    };
+
+    console.log(`[GrsAIImageAdapter] 发起图生图编辑: model=gpt-image-2, imageUrl=${fullImageUrl.substring(0, 80)}...`);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(300000), // 5分钟超时
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`GrsAI Edit API 请求失败 (${response.status}): ${errorText}`);
+    }
+
+    // 解析 SSE 响应，等待最终结果
+    return this.parseSSEResponse(response);
+  }
+
+  /**
+   * 将本地路径（如 /uploads/ref_images/xxx.jpg）转为完整URL
+   */
+  private toFullUrl(localPath: string): string {
+    if (localPath.startsWith("http://") || localPath.startsWith("https://")) {
+      return localPath;
+    }
+    return `${config.publicBaseUrl}${localPath}`;
   }
 
   /**

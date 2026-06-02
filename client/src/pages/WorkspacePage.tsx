@@ -3,6 +3,7 @@ import { Box, Grid, Paper, Typography, Button, Dialog, DialogTitle, DialogConten
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import { ModelSelector } from '@/components/ModelSelector/ModelSelector';
 import { PromptInput } from '@/components/PromptInput/PromptInput';
+import { ImageUpload, UploadedReferenceImage } from '@/components/ImageUpload/ImageUpload';
 import { ImageResult } from '@/components/ResultViewer/ImageResult';
 import { VideoResult } from '@/components/ResultViewer/VideoResult';
 import { TextResult } from '@/components/ResultViewer/TextResult';
@@ -10,7 +11,7 @@ import { TaskStatus } from '@/components/ResultViewer/TaskStatus';
 import { useCreateTask, useTaskPolling } from '@/hooks/useTasks';
 import { useBalance } from '@/hooks/useCredits';
 import type { AIModel } from '@/api/models';
-import type { GenerationTask } from '@/api/tasks';
+import type { GenerationTask, ReferenceImage } from '@/api/tasks';
 
 type ActiveTab = 'image' | 'video' | 'text';
 
@@ -19,6 +20,7 @@ export default function WorkspacePage() {
   const [prompt, setPrompt] = useState('');
   const [activeTab, setActiveTab] = useState<ActiveTab>('image');
   const [selectedDuration, setSelectedDuration] = useState<number | undefined>(undefined);
+  const [referenceImages, setReferenceImages] = useState<UploadedReferenceImage[]>([]);
 
   const createTaskMutation = useCreateTask();
   const { task, isPolling, poll } = useTaskPolling();
@@ -28,18 +30,21 @@ export default function WorkspacePage() {
 
   const balance = balanceData?.balance ?? 0;
 
-  // 当 selectedModel 变化时重置 duration
+  // 当 selectedModel 变化时重置 duration 和参考图
   useEffect(() => {
     if (selectedModel?.type === 'video' && selectedModel.durationOptions?.length) {
       setSelectedDuration(selectedModel.durationOptions[0]);
     } else {
       setSelectedDuration(undefined);
     }
+    // 模型切换时清空参考图
+    setReferenceImages([]);
   }, [selectedModel?.id]);
 
-  // 当 tab 变化时清除已选模型
+  // 当 tab 变化时清除已选模型和参考图
   useEffect(() => {
     setSelectedModel(null);
+    setReferenceImages([]);
   }, [activeTab]);
 
   // 计算实际积分
@@ -56,12 +61,18 @@ export default function WorkspacePage() {
       return;
     }
 
+    // 构建参考图数据（只传 url 和 role）
+    const refImages: ReferenceImage[] | undefined = referenceImages.length > 0
+      ? referenceImages.map(img => ({ url: img.url, role: img.role }))
+      : undefined;
+
     createTaskMutation.mutate(
       {
         modelId: selectedModel.id,
         prompt,
         params: selectedDuration ? { duration: selectedDuration } : {},
         duration: selectedDuration,
+        referenceImages: refImages,
       },
       {
         onSuccess: (data) => {
@@ -70,7 +81,7 @@ export default function WorkspacePage() {
         },
       },
     );
-  }, [selectedModel, prompt, balance, actualCost, selectedDuration, createTaskMutation, poll, refetchBalance]);
+  }, [selectedModel, prompt, balance, actualCost, selectedDuration, referenceImages, createTaskMutation, poll, refetchBalance]);
 
   const isGenerating = createTaskMutation.isPending || isPolling;
   const canGenerate = selectedModel && prompt.trim().length > 0 && !isGenerating;
@@ -108,7 +119,7 @@ export default function WorkspacePage() {
           </Paper>
         </Grid>
 
-        {/* Right panel: Prompt + Result */}
+        {/* Right panel: Prompt + Upload + Result */}
         <Grid item xs={12} md={8}>
           <Paper sx={{ p: 3, mb: 3 }}>
             <PromptInput
@@ -125,6 +136,14 @@ export default function WorkspacePage() {
               durationPricing={selectedModel?.durationPricing}
               selectedDuration={selectedDuration}
               onDurationChange={setSelectedDuration}
+            />
+
+            {/* 参考图上传区域 */}
+            <ImageUpload
+              modelId={selectedModel?.id ?? null}
+              modelType={selectedModel?.type}
+              value={referenceImages}
+              onChange={setReferenceImages}
             />
           </Paper>
 

@@ -3,11 +3,12 @@
 // 支持 sora-2 / doubao-seedance-2-0-fast-260128 / kling-v3-video-generation
 // sora-2: POST /v1/videos (multipart/form-data)
 // seedance/kling: POST /v1/responses (JSON)
+// 支持参考图：Seedance(首帧/末帧/参考图)、Kling(首帧/末帧)、Sora-2(不支持)
 // ============================================================
 
 import fs from "fs";
 import path from "path";
-import type { AdapterResult, GenerateParams, TaskStatusResult } from "../types/index.js";
+import type { AdapterResult, GenerateParams, ReferenceImage, TaskStatusResult } from "../types/index.js";
 import { config } from "../config/index.js";
 
 /** DMXAPI 视频适配器，支持 sora-2 / doubao-seedance-2-0-260128 / doubao-seedance-2-0-fast-260128 / kling-v3-video-generation */
@@ -20,6 +21,14 @@ export class DMXAPIVideoAdapter {
     this.modelId = modelId;
     this.baseUrl = config.providers.dmxapi.baseUrl;
     this.apiKey = config.providers.dmxapi.apiKey;
+  }
+
+  /** 将本地路径（如 /uploads/ref_images/xxx.jpg）转为完整URL */
+  private toFullUrl(localPath: string): string {
+    if (localPath.startsWith("http://") || localPath.startsWith("https://")) {
+      return localPath;
+    }
+    return `${config.publicBaseUrl}${localPath}`;
   }
 
   /** 从提交响应中提取 taskId，兼容两种返回格式 */
@@ -53,7 +62,7 @@ export class DMXAPIVideoAdapter {
   }
 
   /** 构建 Seedance 2.0 提交请求体 (input是数组格式，标准版和Fast版共用) */
-  private buildSeedanceBody(prompt: string, params?: GenerateParams): Record<string, unknown> {
+  private buildSeedanceBody(prompt: string, params?: GenerateParams, referenceImages?: ReferenceImage[]): Record<string, unknown> {
     const duration = params?.duration ?? 5;
     const clampedDuration = Math.max(4, Math.min(15, duration));
     const width = params?.width ?? 1280;
@@ -65,9 +74,24 @@ export class DMXAPIVideoAdapter {
       ratio = "1:1";
     }
 
+    // 构建 input 数组，先添加文本项
+    const input: Array<Record<string, unknown>> = [{ type: "text", text: prompt }];
+
+    // 添加参考图项
+    if (referenceImages && referenceImages.length > 0) {
+      for (const img of referenceImages) {
+        const fullUrl = this.toFullUrl(img.url);
+        input.push({
+          type: "image_url",
+          image_url: { url: fullUrl },
+          role: img.role,  // "first_frame" / "last_frame" / "reference_image"
+        });
+      }
+    }
+
     return {
       model: this.modelId,  // 使用实际传入的 modelId（标准版或Fast版）
-      input: [{ type: "text", text: prompt }],
+      input,
       duration: clampedDuration,
       ratio,
       resolution: "720p",
@@ -76,7 +100,7 @@ export class DMXAPIVideoAdapter {
   }
 
   /** 构建 Kling V3 提交请求体 (input是对象格式) */
-  private buildKlingBody(prompt: string, params?: GenerateParams): Record<string, unknown> {
+  private buildKlingBody(prompt: string, params?: GenerateParams, referenceImages?: ReferenceImage[]): Record<string, unknown> {
     const duration = params?.duration ?? 5;
     const clampedDuration = Math.max(3, Math.min(15, duration));
     const width = params?.width ?? 1280;
@@ -88,9 +112,30 @@ export class DMXAPIVideoAdapter {
       aspectRatio = "1:1";
     }
 
+    // 构建 input 对象
+    const inputObj: Record<string, unknown> = { prompt };
+
+    // 添加参考图到 media 数组
+    if (referenceImages && referenceImages.length > 0) {
+      const media: Array<Record<string, string>> = [];
+      for (const img of referenceImages) {
+        const fullUrl = this.toFullUrl(img.url);
+        // Kling 使用 "first_frame" / "last_frame" 作为 type
+        if (img.role === "first_frame" || img.role === "last_frame") {
+          media.push({ type: img.role, url: fullUrl });
+        } else if (img.role === "reference_image") {
+          // reference_image 在 Kling 中映射为 first_frame
+          media.push({ type: "first_frame", url: fullUrl });
+        }
+      }
+      if (media.length > 0) {
+        inputObj.media = media;
+      }
+    }
+
     return {
       model: "kling-v3-video-generation",
-      input: { prompt },
+      input: inputObj,
       parameters: {
         duration: clampedDuration,
         mode: "std",
@@ -163,10 +208,13 @@ export class DMXAPIVideoAdapter {
 
   /** 发起视频生成请求 */
   async generate(prompt: string, params?: GenerateParams): Promise<AdapterResult> {
-    // Sora-2 使用独立的 multipart 提交流程
+    // Sora-2 使用独立的 multipart 提交流程（不支持参考图）
     if (this.modelId === "sora-2") {
       return this.submitSoraTask(prompt, params);
     }
+
+    // 获取 referenceImages
+    const referenceImages = params?.referenceImages as ReferenceImage[] | undefined;
 
     // Seedance / Kling 使用 JSON + /v1/responses
     const url = `${this.baseUrl}/responses`;
@@ -175,16 +223,16 @@ export class DMXAPIVideoAdapter {
     switch (this.modelId) {
       case "doubao-seedance-2-0-fast-260128":
       case "doubao-seedance-2-0-260128":
-        body = this.buildSeedanceBody(prompt, params);
+        body = this.buildSeedanceBody(prompt, params, referenceImages);
         break;
       case "kling-v3-video-generation":
-        body = this.buildKlingBody(prompt, params);
+        body = this.buildKlingBody(prompt, params, referenceImages);
         break;
       default:
         throw new Error(`DMXAPI 视频适配器不支持的模型: ${this.modelId}`);
     }
 
-    console.log(`[DMXAPIVideoAdapter] 发起视频生成: model=${this.modelId}, url=${url}`);
+    console.log(`[DMXAPIVideoAdapter] 发起视频生成: model=${this.modelId}, url=${url}, referenceImages=${referenceImages?.length ?? 0}`);
 
     const response = await fetch(url, {
       method: "POST",
