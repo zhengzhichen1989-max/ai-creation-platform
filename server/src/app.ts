@@ -39,7 +39,10 @@ export async function buildApp() {
   });
 
   // 注册静态文件服务（/uploads 目录）
-  const uploadsDir = config.uploadDir;
+  // @fastify/static 要求 root 必须是绝对路径
+  const uploadsDir = path.isAbsolute(config.uploadDir)
+    ? config.uploadDir
+    : path.resolve(__dirname, "../../", config.uploadDir);
   await app.register(fastifyStatic, {
     root: uploadsDir,
     prefix: "/uploads/",

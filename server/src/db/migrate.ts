@@ -212,8 +212,10 @@ export async function runMigration(): Promise<void> {
   }
 
   // 删除旧模型数据，插入新的9个真实模型
-  // 先删除所有旧模型
+  // 先删除所有旧模型（需先关闭外键约束以避免 generation_tasks 的FK报错）
+  sqlite.run("PRAGMA foreign_keys = OFF");
   sqlite.run("DELETE FROM ai_models");
+  sqlite.run("PRAGMA foreign_keys = ON");
   console.log("[Migration] 已清除旧模型数据");
 
   // 注意：模型 id 使用 DMXAPI/GrsAI 实际的模型ID，前端显示名保持友好名称

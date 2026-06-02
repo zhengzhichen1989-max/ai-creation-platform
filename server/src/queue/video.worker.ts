@@ -10,6 +10,7 @@ import type { GenerateParams, AdapterResult, TaskStatusResult, ReferenceImage } 
 
 /** 适配器注册表：按模型ID路由到对应适配器（使用DMXAPI真实模型ID） */
 const adapterMap: Record<string, (modelId: string) => DMXAPIVideoAdapter> = {
+  'doubao-seedance-2-0-260128': (modelId) => new DMXAPIVideoAdapter(modelId),
   'doubao-seedance-2-0-fast-260128': (modelId) => new DMXAPIVideoAdapter(modelId),
   'sora-2': (modelId) => new DMXAPIVideoAdapter(modelId),
   'kling-v3-video-generation': (modelId) => new DMXAPIVideoAdapter(modelId),
