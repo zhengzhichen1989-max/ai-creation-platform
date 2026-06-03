@@ -5,15 +5,22 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
-import fastifyStatic from "@fastify/static";
+import fs from "fs";
 import { registerRoutes } from "./routes/index.js";
 import { errorHandler } from "./middleware/error.middleware.js";
 import { config } from "./config/index.js";
 import path from "path";
-import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+/** MIME 类型映射 */
+const MIME_TYPES: Record<string, string> = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".mp4": "video/mp4",
+  ".txt": "text/plain",
+};
 
 /** 创建 Fastify 应用实例 */
 export async function buildApp() {
@@ -38,15 +45,27 @@ export async function buildApp() {
     },
   });
 
-  // 注册静态文件服务（/uploads 目录）
-  // @fastify/static 要求 root 必须是绝对路径
-  const uploadsDir = path.isAbsolute(config.uploadDir)
-    ? config.uploadDir
-    : path.resolve(__dirname, "../../", config.uploadDir);
-  await app.register(fastifyStatic, {
-    root: uploadsDir,
-    prefix: "/uploads/",
-    decorateReply: false,
+  // 注册静态文件服务 — 使用自定义通配路由代替 @fastify/static
+  // config.uploadDir 已在 config/index.ts 中通过 process.cwd() 解析为绝对路径
+  const uploadsDir = config.uploadDir;
+
+  app.get("/uploads/*", async (request, reply) => {
+    const relativePath = (request.params as { "*": string })["*"];
+    // 安全检查：防止路径遍历
+    const safePath = relativePath.replace(/\.\./g, "").replace(/\/\//g, "");
+    const filePath = path.join(uploadsDir, safePath);
+
+    if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+      return reply.status(404).send({ code: 404, message: "文件不存在" });
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = MIME_TYPES[ext] || "application/octet-stream";
+    const stream = fs.createReadStream(filePath);
+
+    reply.header("Content-Type", contentType);
+    reply.header("Cache-Control", "public, max-age=86400"); // 缓存1天
+    return reply.send(stream);
   });
 
   // 注册路由

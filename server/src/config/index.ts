@@ -9,8 +9,8 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 加载 .env 文件
-dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+// 加载 .env 文件 — 使用 process.cwd() 确保从 server/ 目录查找
+dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
 /** 应用配置 */
 export const config = {
@@ -20,8 +20,8 @@ export const config = {
   /** 运行环境 */
   nodeEnv: process.env.NODE_ENV || "development",
 
-  /** 数据库路径 */
-  databaseUrl: process.env.DATABASE_URL || path.resolve(__dirname, "../../data/ai-creation.db"),
+  /** 数据库路径 — 使用 process.cwd() 解析相对路径 */
+  databaseUrl: process.env.DATABASE_URL || path.resolve(process.cwd(), "data/ai-creation.db"),
 
   /** JWT 配置 */
   jwt: {
@@ -50,8 +50,10 @@ export const config = {
     },
   },
 
-  /** 上传目录 */
-  uploadDir: process.env.UPLOAD_DIR || path.resolve(__dirname, "../../uploads"),
+  /** 上传目录 — 使用 process.cwd() 解析相对路径，确保与 tsx CWD 一致 */
+  uploadDir: process.env.UPLOAD_DIR
+    ? (path.isAbsolute(process.env.UPLOAD_DIR) ? process.env.UPLOAD_DIR : path.resolve(process.cwd(), process.env.UPLOAD_DIR))
+    : path.resolve(process.cwd(), "uploads"),
 
   /** 公网基础URL（用于将本地路径转为完整URL） */
   publicBaseUrl: process.env.PUBLIC_BASE_URL || "http://localhost:3000",
