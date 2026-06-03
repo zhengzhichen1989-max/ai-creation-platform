@@ -35,9 +35,9 @@ export async function register(email: string, password: string, nickname: string
     const userIdResult = db.exec("SELECT last_insert_rowid() as id");
     const userId = userIdResult[0].values[0][0] as number;
 
-    // 创建积分账户，赠送50积分
+    // 创建积分账户，赠送30积分
     db.run(
-      "INSERT INTO credit_accounts (user_id, balance, version) VALUES (?, 50, 0)",
+      "INSERT INTO credit_accounts (user_id, balance, version) VALUES (?, 30, 0)",
       [userId]
     );
 

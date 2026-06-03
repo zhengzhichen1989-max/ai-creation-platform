@@ -221,18 +221,18 @@ export async function runMigration(): Promise<void> {
   // 注意：模型 id 使用 DMXAPI/GrsAI 实际的模型ID，前端显示名保持友好名称
   const models = [
     // GrsAI 图片模型
-    { id: "gpt-image-2", name: "GPT Image 2", type: "image", category: "flagship", cost_credits: 5, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 1, duration_options: null, duration_pricing: null, provider: "grsai" },
-    { id: "nano-banana-pro", name: "Nano Banana Pro", type: "image", category: "advanced", cost_credits: 3, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 2, duration_options: null, duration_pricing: null, provider: "grsai" },
+    { id: "gpt-image-2", name: "GPT Image 2", type: "image", category: "flagship", cost_credits: 3, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 1, duration_options: null, duration_pricing: null, provider: "grsai" },
+    { id: "nano-banana-pro", name: "Nano Banana Pro", type: "image", category: "advanced", cost_credits: 6, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 2, duration_options: null, duration_pricing: null, provider: "grsai" },
     { id: "nano-banana-fast", name: "Nano Banana Fast", type: "image", category: "starter", cost_credits: 1, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 3, duration_options: null, duration_pricing: null, provider: "grsai" },
     { id: "flux-pro", name: "Flux Pro", type: "image", category: "standard", cost_credits: 4, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 4, duration_options: null, duration_pricing: null, provider: "grsai" },
     // DMXAPI 视频模型（id使用真实模型ID，name保持前端友好显示名）
-    { id: "doubao-seedance-2-0-260128", name: "Seedance 2.0", type: "video", category: "flagship", cost_credits: 25, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 5, duration_options: "[5,10,15]", duration_pricing: '{"5":25,"10":45,"15":65}', provider: "dmxapi" },
-    { id: "doubao-seedance-2-0-fast-260128", name: "Seedance 2.0 Fast", type: "video", category: "advanced", cost_credits: 15, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 6, duration_options: "[5,10]", duration_pricing: '{"5":15,"10":25}', provider: "dmxapi" },
-    { id: "sora-2", name: "Sora 2", type: "video", category: "flagship", cost_credits: 30, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 4, defaultFps: 24 }), sort_order: 7, duration_options: "[4,8,12]", duration_pricing: '{"4":20,"8":30,"12":45}', provider: "dmxapi" },
-    { id: "kling-v3-video-generation", name: "可灵 Kling 3.0", type: "video", category: "standard", cost_credits: 15, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 8, duration_options: "[5,10]", duration_pricing: '{"5":15,"10":25}', provider: "dmxapi" },
+    { id: "doubao-seedance-2-0-260128", name: "Seedance 2.0", type: "video", category: "flagship", cost_credits: 10, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 5, duration_options: "[5,10,15]", duration_pricing: '{"5":10,"10":20,"15":30}', provider: "dmxapi" },
+    { id: "doubao-seedance-2-0-fast-260128", name: "Seedance 2.0 Fast", type: "video", category: "advanced", cost_credits: 6, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 6, duration_options: "[5,10]", duration_pricing: '{"5":6,"10":12}', provider: "dmxapi" },
+    { id: "sora-2", name: "Sora 2", type: "video", category: "flagship", cost_credits: 20, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 4, defaultFps: 24 }), sort_order: 7, duration_options: "[4,8,12]", duration_pricing: '{"4":20,"8":40,"12":60}', provider: "dmxapi" },
+    { id: "kling-v3-video-generation", name: "可灵 Kling 3.0", type: "video", category: "standard", cost_credits: 5, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 8, duration_options: "[5,10]", duration_pricing: '{"5":5,"10":10}', provider: "dmxapi" },
     // DMXAPI 文案模型（id使用真实模型ID，name保持前端友好显示名）
-    { id: "deepseek-chat", name: "DeepSeek V4", type: "text", category: "starter", cost_credits: 2, adapter_class: "DMXAPITextAdapter", enabled: 1, config: null, sort_order: 9, duration_options: null, duration_pricing: null, provider: "dmxapi" },
-    { id: "qwen-max", name: "Qwen3-Max", type: "text", category: "standard", cost_credits: 3, adapter_class: "DMXAPITextAdapter", enabled: 1, config: null, sort_order: 10, duration_options: null, duration_pricing: null, provider: "dmxapi" },
+    { id: "deepseek-chat", name: "DeepSeek V4", type: "text", category: "starter", cost_credits: 1, adapter_class: "DMXAPITextAdapter", enabled: 1, config: null, sort_order: 9, duration_options: null, duration_pricing: null, provider: "dmxapi" },
+    { id: "qwen-max", name: "Qwen3-Max", type: "text", category: "standard", cost_credits: 2, adapter_class: "DMXAPITextAdapter", enabled: 1, config: null, sort_order: 10, duration_options: null, duration_pricing: null, provider: "dmxapi" },
   ];
 
   for (const m of models) {
@@ -248,10 +248,9 @@ export async function runMigration(): Promise<void> {
   const packageCount = packageCountResult[0]?.values[0]?.[0] as number || 0;
   if (packageCount === 0) {
     const packages = [
-      { id: "trial", name: "体验包", credits: 50, price_cents: 490, unit_label: "约0.10元/积分", enabled: 1, sort_order: 1 },
-      { id: "standard", name: "标准包", credits: 200, price_cents: 1590, unit_label: "约0.08元/积分", enabled: 1, sort_order: 2 },
-      { id: "professional", name: "专业包", credits: 600, price_cents: 3990, unit_label: "约0.07元/积分", enabled: 1, sort_order: 3 },
-      { id: "team", name: "团队包", credits: 2000, price_cents: 9990, unit_label: "约0.05元/积分", enabled: 1, sort_order: 4 },
+      { id: "basic", name: "基础套餐", credits: 500, price_cents: 6800, unit_label: "约0.14元/积分", enabled: 1, sort_order: 1 },
+      { id: "pro", name: "专业套餐", credits: 1300, price_cents: 15800, unit_label: "约0.12元/积分", enabled: 1, sort_order: 2 },
+      { id: "ultimate", name: "旗舰套餐", credits: 2800, price_cents: 29900, unit_label: "约0.11元/积分", enabled: 1, sort_order: 3 },
     ];
 
     for (const p of packages) {
