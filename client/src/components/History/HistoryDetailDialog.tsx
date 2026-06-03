@@ -1,11 +1,14 @@
+import { useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Typography, Chip, IconButton } from '@mui/material';
 import Close from '@mui/icons-material/Close';
 import Download from '@mui/icons-material/Download';
 import ImageIcon from '@mui/icons-material/Image';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
 import ArticleIcon from '@mui/icons-material/Article';
+import BrokenImage from '@mui/icons-material/BrokenImage';
 import dayjs from 'dayjs';
 import type { GenerationItem } from '@/api/generations';
+import { getMediaUrl } from '@/utils/mediaUrl';
 
 interface HistoryDetailDialogProps {
   item: GenerationItem | null;
@@ -14,6 +17,7 @@ interface HistoryDetailDialogProps {
 }
 
 export function HistoryDetailDialog({ item, open, onClose }: HistoryDetailDialogProps) {
+  const [imgError, setImgError] = useState(false);
   if (!item) return null;
 
   const isVideo = item.type === 'video';
@@ -24,7 +28,9 @@ export function HistoryDetailDialog({ item, open, onClose }: HistoryDetailDialog
     if (!item.resultUrl) return;
 
     try {
-      const response = await fetch(item.resultUrl);
+      const downloadUrl = getMediaUrl(item.resultUrl) || item.resultUrl;
+      const response = await fetch(downloadUrl);
+      if (!response.ok) throw new Error(`下载失败: ${response.status}`);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -36,7 +42,7 @@ export function HistoryDetailDialog({ item, open, onClose }: HistoryDetailDialog
       window.URL.revokeObjectURL(url);
     } catch {
       // Fallback: open in new tab
-      window.open(item.resultUrl, '_blank');
+      window.open(getMediaUrl(item.resultUrl) || item.resultUrl, '_blank');
     }
   };
 
@@ -70,11 +76,12 @@ export function HistoryDetailDialog({ item, open, onClose }: HistoryDetailDialog
 
       <DialogContent>
         {/* Result display */}
-        {item.resultUrl && isImage && (
+        {item.resultUrl && isImage && !imgError && (
           <Box sx={{ textAlign: 'center', mb: 2 }}>
             <img
-              src={item.resultUrl}
+              src={getMediaUrl(item.resultUrl) ?? undefined}
               alt={item.prompt}
+              onError={() => setImgError(true)}
               style={{
                 maxWidth: '100%',
                 maxHeight: 512,
@@ -85,10 +92,19 @@ export function HistoryDetailDialog({ item, open, onClose }: HistoryDetailDialog
           </Box>
         )}
 
+        {item.resultUrl && isImage && imgError && (
+          <Box sx={{ textAlign: 'center', py: 4, mb: 2 }}>
+            <BrokenImage sx={{ fontSize: 64, color: 'grey.400' }} />
+            <Typography color="text.secondary" sx={{ mt: 1 }}>
+              图片加载失败（可能已过期或网络不可达）
+            </Typography>
+          </Box>
+        )}
+
         {item.resultUrl && isVideo && (
           <Box sx={{ textAlign: 'center', mb: 2 }}>
             <video
-              src={item.resultUrl}
+              src={getMediaUrl(item.resultUrl)}
               controls
               autoPlay
               style={{

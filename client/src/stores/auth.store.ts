@@ -38,6 +38,7 @@ export const useAuthStore = create<AuthState>()(
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
         user: state.user,
+        isAdmin: state.isAdmin,
       }),
     },
   ),

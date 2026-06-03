@@ -6,6 +6,7 @@ import { DMXAPIVideoAdapter } from "../adapters/dmxapi-video.adapter.js";
 import type { QueueJobData, QueueProcessor } from "./index.js";
 import * as taskService from "../services/task.service.js";
 import * as creditsService from "../services/credits.service.js";
+import { downloadIfExternal } from "../utils/download.js";
 import type { GenerateParams, AdapterResult, TaskStatusResult, ReferenceImage } from "../types/index.js";
 
 /** 适配器注册表：按模型ID路由到对应适配器（使用DMXAPI真实模型ID） */
@@ -62,8 +63,9 @@ export const videoProcessor: QueueProcessor = async (job: QueueJobData): Promise
     // 5. 处理结果
     if (status.status === "completed") {
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().replace("T", " ").replace(/\.\d+Z$/, "");
+      const localUrl = await downloadIfExternal(status.resultUrl, "video");
       taskService.updateTaskStatus(taskId, "completed", {
-        resultUrl: status.resultUrl,
+        resultUrl: localUrl,
         progress: 100,
         expiresAt,
       });

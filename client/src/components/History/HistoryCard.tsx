@@ -5,6 +5,7 @@ import VideoFileIcon from '@mui/icons-material/VideoFile';
 import ArticleIcon from '@mui/icons-material/Article';
 import dayjs from 'dayjs';
 import type { GenerationItem } from '@/api/generations';
+import { getMediaUrl } from '@/utils/mediaUrl';
 import { HistoryDetailDialog } from './HistoryDetailDialog';
 
 interface HistoryCardProps {
@@ -13,9 +14,10 @@ interface HistoryCardProps {
 
 export function HistoryCard({ item }: HistoryCardProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [thumbError, setThumbError] = useState(false);
   const isVideo = item.type === 'video';
   const isText = item.type === 'text';
-  const thumbnailUrl = item.resultThumbnail || item.resultUrl;
+  const thumbnailUrl = getMediaUrl(item.resultThumbnail || item.resultUrl);
 
   return (
     <>
@@ -34,11 +36,12 @@ export function HistoryCard({ item }: HistoryCardProps) {
         }}
       >
         {/* Thumbnail */}
-        {thumbnailUrl && item.type === 'image' ? (
+        {thumbnailUrl && item.type === 'image' && !thumbError ? (
           <CardMedia
             component="img"
-            image={thumbnailUrl}
+            image={thumbnailUrl ?? undefined}
             alt={item.prompt}
+            onError={() => setThumbError(true)}
             sx={{ height: 180, objectFit: 'cover' }}
           />
         ) : (

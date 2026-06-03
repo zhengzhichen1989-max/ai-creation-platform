@@ -6,6 +6,7 @@ import { GrsAIImageAdapter } from "../adapters/grsai-image.adapter.js";
 import type { QueueJobData, QueueProcessor } from "./index.js";
 import * as taskService from "../services/task.service.js";
 import * as creditsService from "../services/credits.service.js";
+import { downloadIfExternal } from "../utils/download.js";
 import type { GenerateParams, AdapterResult, TaskStatusResult, ReferenceImage } from "../types/index.js";
 
 /** 适配器注册表：按模型ID路由到对应适配器 */
@@ -44,9 +45,11 @@ export const imageProcessor: QueueProcessor = async (job: QueueJobData): Promise
     // 4. GrsAI图片生成是异步的，需要轮询
     if (result.status === "completed") {
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().replace("T", " ").replace(/\.\d+Z$/, "");
+      const localUrl = await downloadIfExternal(result.resultUrl, "image");
+      const localThumbnail = await downloadIfExternal(result.thumbnailUrl, "image_thumb");
       taskService.updateTaskStatus(taskId, "completed", {
-        resultUrl: result.resultUrl,
-        resultThumbnail: result.thumbnailUrl,
+        resultUrl: localUrl,
+        resultThumbnail: localThumbnail,
         progress: 100,
         expiresAt,
       });
@@ -70,8 +73,9 @@ export const imageProcessor: QueueProcessor = async (job: QueueJobData): Promise
 
       if (status.status === "completed") {
         const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().replace("T", " ").replace(/\.\d+Z$/, "");
+        const localUrl = await downloadIfExternal(status.resultUrl, "image");
         taskService.updateTaskStatus(taskId, "completed", {
-          resultUrl: status.resultUrl,
+          resultUrl: localUrl,
           progress: 100,
           expiresAt,
         });
