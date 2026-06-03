@@ -94,8 +94,8 @@ async function uploadImage(file: File): Promise<string> {
     '/upload/image',
     formData,
     {
-      headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 60000, // 上传超时60秒
+      // 注意：不要手动设置 Content-Type，apiClient interceptor 会自动处理 FormData 的 boundary
     },
   );
 

@@ -10,12 +10,17 @@ const apiClient = axios.create({
   },
 });
 
-/** Request interceptor — attach access token */
+/** Request interceptor — attach access token, fix FormData Content-Type */
 apiClient.interceptors.request.use(
   (config) => {
     const accessToken = useAuthStore.getState().accessToken;
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
+    }
+    // 当发送 FormData 时，删除手动设置的 Content-Type，让浏览器自动设置
+    // multipart/form-data + 正确的 boundary（手动设置会丢失 boundary 导致后端解析失败）
+    if (config.data instanceof FormData) {
+      delete (config.headers as Record<string, unknown>)['Content-Type'];
     }
     return config;
   },
