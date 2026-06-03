@@ -262,6 +262,24 @@ export async function runMigration(): Promise<void> {
     console.log("[Migration] 积分包种子数据插入完成（4条）");
   }
 
+  // 新建 orders 表（微信支付订单表）
+  sqlite.run(`
+    CREATE TABLE IF NOT EXISTS orders (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      package_id TEXT NOT NULL,
+      credits INTEGER NOT NULL,
+      amount INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      transaction_id TEXT,
+      paid_at TEXT,
+      expired_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  console.log("[Migration] orders 表创建完成");
+
   // 保存到文件
   saveDatabase();
 

@@ -30,6 +30,21 @@ export async function buildApp() {
     },
   });
 
+  // 保留原始JSON body用于微信回调签名验证
+  // Fastify默认将JSON body解析为对象，JSON.stringify重新序列化后字段顺序可能与微信原始请求不同
+  // 因此需要自定义content type parser来保留原始body字符串
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+    try {
+      const json = JSON.parse(body as string);
+      // 将原始字符串挂到request上供后续使用
+      (req as any).rawBody = body as string;
+      done(null, json);
+    } catch (err: any) {
+      err.statusCode = 400;
+      done(err);
+    }
+  });
+
   // 注册 CORS 插件
   await app.register(cors, {
     origin: true, // 开发环境允许所有来源

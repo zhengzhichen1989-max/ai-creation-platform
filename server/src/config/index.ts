@@ -58,6 +58,16 @@ export const config = {
   /** 公网基础URL（用于将本地路径转为完整URL） */
   publicBaseUrl: process.env.PUBLIC_BASE_URL || "http://localhost:3000",
 
+  /** 微信支付V3配置 */
+  wechatPay: {
+    appId: process.env.WECHAT_APP_ID || '',  // 暂时为空，备案后配置
+    mchId: process.env.WECHAT_MCH_ID || '1746233566',
+    apiV3Key: process.env.WECHAT_API_V3_KEY || '',
+    serialNo: process.env.WECHAT_SERIAL_NO || '',
+    privateKey: process.env.WECHAT_PRIVATE_KEY || '',  // PEM内容，为空则从certs/目录读取文件
+    notifyUrl: process.env.WECHAT_NOTIFY_URL || 'https://zhiyingworks.cn/api/v1/payment/notify',  // 备案后配置
+  },
+
   /** 是否为开发环境 */
   get isDev(): boolean {
     return this.nodeEnv === "development";

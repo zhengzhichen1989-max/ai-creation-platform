@@ -47,40 +47,13 @@ export async function creditsRoutes(app: FastifyInstance): Promise<void> {
     reply.send(successResponse(packages));
   });
 
-  /** POST /api/v1/credits/purchase - 购买积分包（需认证，MVP模拟充值） */
-  app.post("/purchase", { preHandler: authMiddleware }, async (request, reply) => {
-    const body = purchaseSchema.parse(request.body);
-    const userId = request.userId!;
-
-    // 查找积分包
-    const db = getDb();
-    const rows = db.exec(
-      "SELECT id, name, credits FROM credit_packages WHERE id = ?",
-      [body.packageId]
-    );
-
-    if (rows.length === 0 || rows[0].values.length === 0) {
-      throw new PackageNotFoundError(body.packageId);
-    }
-
-    const pkg = rows[0].values[0];
-    const credits = pkg[2] as number;
-
-    // MVP: 模拟充值，直接增加积分
-    const orderId = `order-${uuidv4()}`;
-    const transaction = creditsService.topUp(
-      userId,
-      credits,
-      orderId,
-      `购买${pkg[1]}`
-    );
-
-    const balance = creditsService.getBalance(userId);
-
-    reply.send(successResponse({
-      balance: balance.balance,
-      transactionId: transaction.id,
-    }));
+  /** POST /api/v1/credits/purchase - 已禁用，请使用微信支付 /api/v1/payment/create-order */
+  app.post("/purchase", { preHandler: authMiddleware }, async (_request, reply) => {
+    reply.code(410).send({
+      code: 410,
+      data: null,
+      message: "模拟充值已关闭，请使用微信支付",
+    });
   });
 
   /** GET /api/v1/credits/transactions - 获取积分流水（需认证） */

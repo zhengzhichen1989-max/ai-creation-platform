@@ -18,7 +18,10 @@ export function usePackages() {
   });
 }
 
-/** Purchase a credit package */
+/**
+ * Purchase a credit package (模拟充值，保留但不再作为主流程)
+ * 真实微信支付流程请使用 useCreateOrder + PaymentDialog
+ */
 export function usePurchasePackage() {
   const queryClient = useQueryClient();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);

@@ -292,3 +292,44 @@ export interface ForgotPasswordResult {
   hasSecurityQuestion: boolean;
   question: string | null;
 }
+
+// ---- 订单与支付类型 ----
+
+/** 订单状态 */
+export type OrderStatus = "pending" | "paid" | "failed" | "expired" | "refunded";
+
+/** 订单信息 */
+export interface OrderInfo {
+  id: string;
+  userId: number;
+  packageId: string;
+  credits: number;
+  amount: number;
+  status: OrderStatus;
+  transactionId: string | null;
+  paidAt: string | null;
+  expiredAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 创建订单请求 */
+export interface CreateOrderRequest {
+  packageId: string;
+}
+
+/** 创建订单响应 */
+export interface CreateOrderResponse {
+  orderId: string;
+  codeUrl: string;
+}
+
+/** 订单状态查询响应 */
+export interface OrderStatusResponse {
+  orderId: string;
+  status: OrderStatus;
+  amount: number;
+  credits: number;
+  packageId: string;
+  createdAt: string;
+}
