@@ -7,6 +7,8 @@
 import type { AdapterResult, GenerateParams, ReferenceImage } from "../types/index.js";
 import { config } from "../config/index.js";
 import { MODEL_PROVIDER_MAP } from "../config/providers.js";
+import fs from "fs";
+import path from "path";
 
 /** GrsAI 图片适配器，支持 /v1/draw/completions 和 /v1/draw/nano-banana 两种端点，以及 /v1/images/edits 图生图端点 */
 export class GrsAIImageAdapter {
@@ -92,13 +94,8 @@ export class GrsAIImageAdapter {
 
   /**
    * 图生图：使用 /v1/images/edits 端点（gpt-image-2 only）
-   * 请求体:
-   * {
-   *   "model": "gpt-image-2",
-   *   "image": imageUrl,  // URL或Base64
-   *   "prompt": "编辑描述",
-   *   "size": "1024x1024"
-   * }
+   * 注意: GrsAI 的 edits 端点必须使用 multipart/form-data 上传图片文件，
+   *       不支持 JSON + URL 格式（会返回 400 "Parameter data type error"）
    */
   async edit(imageUrl: string, prompt: string, params?: GenerateParams): Promise<AdapterResult> {
     const url = `${this.baseUrl}/v1/images/edits`;
@@ -106,25 +103,25 @@ export class GrsAIImageAdapter {
       ? `${params.width}x${params.height}`
       : "1024x1024";
 
-    // 将本地路径转为完整URL
-    const fullImageUrl = this.toFullUrl(imageUrl);
+    // 构建 multipart/form-data 请求体
+    const formData = new FormData();
+    formData.append("model", "gpt-image-2");
+    formData.append("prompt", prompt);
+    formData.append("size", size);
 
-    const body: Record<string, unknown> = {
-      model: "gpt-image-2",
-      image: fullImageUrl,
-      prompt,
-      size,
-    };
+    // 获取图片 Blob：本地文件优先，否则下载远程 URL
+    const imageBlob = await this.getImageBlob(imageUrl);
+    formData.append("image", imageBlob, "image.jpg");
 
-    console.log(`[GrsAIImageAdapter] 发起图生图编辑: model=gpt-image-2, imageUrl=${fullImageUrl.substring(0, 80)}...`);
+    console.log(`[GrsAIImageAdapter] 发起图生图编辑(multipart): model=gpt-image-2`);
 
     const response = await fetch(url, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
         "Authorization": `Bearer ${this.apiKey}`,
+        // 不设置 Content-Type，让 fetch 自动设置 multipart/form-data + boundary
       },
-      body: JSON.stringify(body),
+      body: formData,
       signal: AbortSignal.timeout(300000), // 5分钟超时
     });
 
@@ -133,8 +130,69 @@ export class GrsAIImageAdapter {
       throw new Error(`GrsAI Edit API 请求失败 (${response.status}): ${errorText}`);
     }
 
-    // 解析 SSE 响应，等待最终结果
-    return this.parseSSEResponse(response);
+    // edits 端点返回 JSON（非 SSE）
+    return this.parseEditResponse(response);
+  }
+
+  /**
+   * 获取图片 Blob（用于 multipart 上传）
+   * 优先从本地文件系统读取（上传的参考图），否则下载远程 URL
+   */
+  private async getImageBlob(imageUrl: string): Promise<Blob> {
+    if (imageUrl.startsWith("/uploads/")) {
+      // 本地文件路径
+      const localPath = path.join(config.uploadDir, imageUrl.replace("/uploads/", ""));
+      if (!fs.existsSync(localPath)) {
+        throw new Error(`参考图文件不存在: ${localPath}`);
+      }
+      const buffer = fs.readFileSync(localPath);
+      const ext = path.extname(localPath).toLowerCase();
+      const mimeType = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+      return new Blob([buffer], { type: mimeType });
+    }
+
+    if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+      // 远程 URL，下载图片
+      const resp = await fetch(imageUrl);
+      if (!resp.ok) {
+        throw new Error(`无法下载参考图 (${resp.status}): ${imageUrl}`);
+      }
+      return resp.blob();
+    }
+
+    throw new Error(`不支持的参考图路径格式: ${imageUrl}`);
+  }
+
+  /**
+   * 解析 OpenAI 图片编辑响应（JSON 格式，非 SSE）
+   * 格式: { created, data: [{ url }], usage }
+   */
+  private async parseEditResponse(response: Response): Promise<AdapterResult> {
+    const data = await response.json() as Record<string, unknown>;
+
+    // OpenAI 图片编辑响应格式
+    const dataArray = data.data as Array<Record<string, unknown>> | undefined;
+    if (dataArray && dataArray.length > 0 && dataArray[0].url) {
+      return {
+        taskId: String(data.created ?? ""),
+        status: "completed",
+        progress: 100,
+        resultUrl: String(dataArray[0].url),
+      };
+    }
+
+    // 备选: 尝试通用提取
+    const imageUrl = this.extractImageUrl(data);
+    if (imageUrl) {
+      return {
+        taskId: String(data.created ?? ""),
+        status: "completed",
+        progress: 100,
+        resultUrl: imageUrl,
+      };
+    }
+
+    throw new Error(`GrsAI Edit API 返回格式异常: ${JSON.stringify(data).substring(0, 200)}`);
   }
 
   /**
