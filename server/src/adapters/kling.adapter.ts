@@ -38,6 +38,8 @@ export class KlingAdapter extends BaseAdapter {
       costCredits: 15,
       durationOptions: [5, 10],
       durationPricing: { "5": 15, "10": 25 },
+      resolutionOptions: null,
+      resolutionPricing: null,
     };
   }
 }

@@ -36,6 +36,8 @@ export class SeedanceAdapter extends BaseAdapter {
       costCredits: 20,
       durationOptions: [5, 10, 15],
       durationPricing: { "5": 20, "10": 35, "15": 50 },
+      resolutionOptions: null,
+      resolutionPricing: null,
     };
   }
 }

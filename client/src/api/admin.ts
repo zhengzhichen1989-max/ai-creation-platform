@@ -47,6 +47,8 @@ export interface AdminAiModel {
   sort_order: number;
   duration_options: string | null;
   duration_pricing: string | null;
+  resolution_options: string | null;
+  resolution_pricing: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -63,6 +65,8 @@ export interface AdminModelCreatePayload {
   sort_order?: number;
   duration_options?: string | null;
   duration_pricing?: string | null;
+  resolution_options?: string | null;
+  resolution_pricing?: string | null;
 }
 
 export interface AdminModelUpdatePayload {
@@ -76,6 +80,8 @@ export interface AdminModelUpdatePayload {
   sort_order?: number;
   duration_options?: string | null;
   duration_pricing?: string | null;
+  resolution_options?: string | null;
+  resolution_pricing?: string | null;
 }
 
 // ---- 用户管理类型 ----

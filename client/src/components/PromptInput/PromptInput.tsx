@@ -15,6 +15,10 @@ interface PromptInputProps {
   durationPricing?: Record<string, number> | null;
   selectedDuration?: number;
   onDurationChange?: (duration: number) => void;
+  resolutionOptions?: string[] | null;
+  resolutionPricing?: Record<string, number | Record<string, number>> | null;
+  selectedResolution?: string;
+  onResolutionChange?: (resolution: string) => void;
 }
 
 const MAX_PROMPT_LENGTH = 2000;
@@ -33,6 +37,10 @@ export function PromptInput({
   durationPricing,
   selectedDuration,
   onDurationChange,
+  resolutionOptions,
+  resolutionPricing,
+  selectedResolution,
+  onResolutionChange,
 }: PromptInputProps) {
   const insufficient = costCredits > 0 && currentBalance < costCredits;
 
@@ -60,21 +68,51 @@ export function PromptInput({
         sx={{ mb: 2 }}
       />
 
-      {selectedModelType === 'video' && durationOptions && durationOptions.length > 0 && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" sx={{ mb: 0.5 }}>视频时长</Typography>
-          <ToggleButtonGroup
-            size="small"
-            exclusive
-            value={selectedDuration || durationOptions[0]}
-            onChange={(_, val) => val && onDurationChange?.(val)}
-          >
-            {durationOptions.map((d) => (
-              <ToggleButton key={d} value={d}>
-                {d}秒 {durationPricing?.[d] ? `(${durationPricing[d]}积分)` : ''}
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
+      {selectedModelType === 'video' && (
+        <Box sx={{ mb: 2, display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+          {durationOptions && durationOptions.length > 0 && (
+            <Box>
+              <Typography variant="body2" sx={{ mb: 0.5 }}>视频时长</Typography>
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={selectedDuration || durationOptions[0]}
+                onChange={(_, val) => val && onDurationChange?.(val)}
+              >
+                {durationOptions.map((d) => (
+                  <ToggleButton key={d} value={d}>
+                    {d}秒 {durationPricing?.[d] ? `(${durationPricing[d]}积分)` : ''}
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+            </Box>
+          )}
+          {resolutionOptions && resolutionOptions.length > 0 && (
+            <Box>
+              <Typography variant="body2" sx={{ mb: 0.5 }}>分辨率</Typography>
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={selectedResolution || resolutionOptions[0]}
+                onChange={(_, val) => val && onResolutionChange?.(val)}
+              >
+                {resolutionOptions.map((r) => {
+                  const resPrice = resolutionPricing?.[r];
+                  let premium = 0;
+                  if (typeof resPrice === 'object' && resPrice !== null && selectedDuration) {
+                    premium = (resPrice as Record<string, number>)[selectedDuration] ?? 0;
+                  } else if (typeof resPrice === 'number') {
+                    premium = resPrice;
+                  }
+                  return (
+                    <ToggleButton key={r} value={r}>
+                      {r === '1080p' ? '1080P' : '720P'} {premium > 0 ? `(+${premium}积分)` : ''}
+                    </ToggleButton>
+                  );
+                })}
+              </ToggleButtonGroup>
+            </Box>
+          )}
         </Box>
       )}
 

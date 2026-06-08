@@ -14,13 +14,14 @@ export function createTask(
   modelId: string,
   prompt: string,
   params?: GenerateParams,
-  duration?: number
+  duration?: number,
+  resolution?: string
 ): GenerationTaskInfo {
   const db = getDb();
 
   // 1. 查询模型信息
   const modelRows = db.exec(
-    "SELECT id, name, type, cost_credits, duration_options, duration_pricing FROM ai_models WHERE id = ? AND enabled = 1",
+    "SELECT id, name, type, cost_credits, duration_options, duration_pricing, resolution_options, resolution_pricing FROM ai_models WHERE id = ? AND enabled = 1",
     [modelId]
   );
   if (modelRows.length === 0 || modelRows[0].values.length === 0) {
@@ -44,6 +45,30 @@ export function createTask(
     }
   }
 
+  // 如果是视频模型且传了 resolution，叠加分辨率附加积分
+  // resolution_pricing 支持两种格式：
+  //   扁平格式（兼容）: {"720p": 0, "1080p": 5}
+  //   按时长嵌套格式: {"720p": {"5": 0, "10": 0}, "1080p": {"5": 66, "10": 127}}
+  if (modelType === "video" && resolution !== undefined) {
+    const resolutionPricingStr = modelRow[7] as string | null;
+    if (resolutionPricingStr) {
+      const resolutionPricing: Record<string, unknown> = JSON.parse(resolutionPricingStr);
+      if (resolutionPricing[resolution] !== undefined) {
+        const resPrice = resolutionPricing[resolution];
+        if (typeof resPrice === "object" && resPrice !== null && duration !== undefined) {
+          // 嵌套格式：按 duration 查找附加价
+          const nested = resPrice as Record<string, number>;
+          if (nested[String(duration)] !== undefined) {
+            costCredits += nested[String(duration)];
+          }
+        } else if (typeof resPrice === "number") {
+          // 扁平格式（兼容旧数据）
+          costCredits += resPrice;
+        }
+      }
+    }
+  }
+
   // 2. 检查积分余额
   const balanceInfo = creditsService.getBalance(userId);
   if (balanceInfo.balance < costCredits) {
@@ -52,7 +77,11 @@ export function createTask(
 
   // 3. 生成任务ID
   const taskId = uuidv4();
-  const paramsJson = params ? JSON.stringify(params) : null;
+  // 将 duration 和 resolution 注入 params，让适配器可读取
+  const mergedParams = { ...params } as Record<string, unknown>;
+  if (duration !== undefined) mergedParams.duration = duration;
+  if (resolution !== undefined) mergedParams.resolution = resolution;
+  const paramsJson = mergedParams && Object.keys(mergedParams).length > 0 ? JSON.stringify(mergedParams) : null;
   const now = new Date().toISOString().replace("T", " ").replace(/\.\d+Z$/, "");
 
   // 4. 原子扣减积分 + 创建任务（事务）

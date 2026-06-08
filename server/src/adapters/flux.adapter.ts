@@ -37,6 +37,8 @@ export class FluxAdapter extends BaseAdapter {
       costCredits: 6,
       durationOptions: null,
       durationPricing: null,
+      resolutionOptions: null,
+      resolutionPricing: null,
     };
   }
 }

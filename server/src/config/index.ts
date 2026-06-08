@@ -68,6 +68,16 @@ export const config = {
     notifyUrl: process.env.WECHAT_NOTIFY_URL || 'https://zhiyingworks.cn/api/v1/payment/notify',  // 备案后配置
   },
 
+  /** 邮件SMTP配置 */
+  email: {
+    host: process.env.EMAIL_HOST || "smtp.qq.com",
+    port: parseInt(process.env.EMAIL_PORT || "465", 10),
+    secure: process.env.EMAIL_SECURE !== "false", // 默认true(SSL)
+    user: process.env.EMAIL_USER || "",           // 发件邮箱
+    pass: process.env.EMAIL_PASS || "",           // 授权码/密码
+    fromName: process.env.EMAIL_FROM_NAME || "织影智作",
+  },
+
   /** 是否为开发环境 */
   get isDev(): boolean {
     return this.nodeEnv === "development";

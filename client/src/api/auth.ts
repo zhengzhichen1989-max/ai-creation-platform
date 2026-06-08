@@ -68,9 +68,9 @@ export async function resetPassword(token: string, newPassword: string): Promise
   await apiClient.post<ApiResponse<{ message: string }>>('/auth/reset-password', { token, newPassword });
 }
 
-/** Forgot password - check security question */
-export async function forgotPassword(email: string): Promise<{ hasSecurityQuestion: boolean; question: string | null }> {
-  const res = await apiClient.post<ApiResponse<{ hasSecurityQuestion: boolean; question: string | null }>>('/auth/forgot-password', { email });
+/** Forgot password - send reset email */
+export async function forgotPassword(email: string): Promise<{ message: string }> {
+  const res = await apiClient.post<ApiResponse<{ message: string }>>('/auth/forgot-password', { email });
   return res.data.data;
 }
 

@@ -15,6 +15,7 @@ const createTaskSchema = z.object({
   prompt: z.string().min(1, "提示词不能为空").max(2000, "提示词最多2000个字符"),
   params: z.record(z.unknown()).optional(),
   duration: z.number().int().positive().optional(),
+  resolution: z.string().optional(),
   referenceImages: z.array(z.object({
     url: z.string().min(1),
     role: z.enum(["first_frame", "last_frame", "reference_image", "edit_source"]),
@@ -29,7 +30,8 @@ export async function tasksRoutes(app: FastifyInstance): Promise<void> {
 
     // 创建任务（含积分扣减）
     const duration = body.duration;
-    const task = taskService.createTask(userId, body.modelId, body.prompt, body.params as GenerateParams, duration);
+    const resolution = body.resolution;
+    const task = taskService.createTask(userId, body.modelId, body.prompt, body.params as GenerateParams, duration, resolution);
 
     // 构建参考图数据
     const referenceImages: ReferenceImage[] | undefined = body.referenceImages?.map(img => ({

@@ -37,6 +37,8 @@ export class StableDiffusionAdapter extends BaseAdapter {
       costCredits: 3,
       durationOptions: null,
       durationPricing: null,
+      resolutionOptions: null,
+      resolutionPricing: null,
     };
   }
 }

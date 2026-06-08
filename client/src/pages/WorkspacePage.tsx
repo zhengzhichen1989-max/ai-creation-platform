@@ -21,6 +21,7 @@ export default function WorkspacePage() {
   const [prompt, setPrompt] = useState('');
   const [activeTab, setActiveTab] = useState<ActiveTab>('image');
   const [selectedDuration, setSelectedDuration] = useState<number | undefined>(undefined);
+  const [selectedResolution, setSelectedResolution] = useState<string | undefined>(undefined);
   const [referenceImages, setReferenceImages] = useState<UploadedReferenceImage[]>([]);
 
   const createTaskMutation = useCreateTask();
@@ -31,12 +32,22 @@ export default function WorkspacePage() {
 
   const balance = balanceData?.balance ?? 0;
 
-  // 当 selectedModel 变化时重置 duration 和参考图
+  // 当 selectedModel 变化时重置 duration、resolution 和参考图
   useEffect(() => {
-    if (selectedModel?.type === 'video' && selectedModel.durationOptions?.length) {
-      setSelectedDuration(selectedModel.durationOptions[0]);
+    if (selectedModel?.type === 'video') {
+      if (selectedModel.durationOptions?.length) {
+        setSelectedDuration(selectedModel.durationOptions[0]);
+      } else {
+        setSelectedDuration(undefined);
+      }
+      if (selectedModel.resolutionOptions?.length) {
+        setSelectedResolution(selectedModel.resolutionOptions[0]);
+      } else {
+        setSelectedResolution(undefined);
+      }
     } else {
       setSelectedDuration(undefined);
+      setSelectedResolution(undefined);
     }
     // 模型切换时清空参考图
     setReferenceImages([]);
@@ -48,16 +59,34 @@ export default function WorkspacePage() {
     setReferenceImages([]);
   }, [activeTab]);
 
-  // 计算实际积分
-  const actualCost = selectedModel?.type === 'video' && selectedDuration && selectedModel.durationPricing
-    ? (selectedModel.durationPricing[selectedDuration] ?? selectedModel.costCredits)
-    : (selectedModel?.costCredits ?? 0);
+  // 计算实际积分（时长基础价 + 分辨率附加价）
+  // resolution_pricing 支持嵌套格式: {"720p":{"5":0,"10":0}, "1080p":{"5":66,"10":127}}
+  const actualCost = useCallback(() => {
+    if (!selectedModel) return 0;
+    let cost = selectedModel.costCredits;
+    if (selectedModel.type === 'video' && selectedDuration && selectedModel.durationPricing) {
+      cost = selectedModel.durationPricing[selectedDuration] ?? cost;
+    }
+    if (selectedModel.type === 'video' && selectedResolution && selectedModel.resolutionPricing) {
+      const resPrice = selectedModel.resolutionPricing[selectedResolution];
+      if (typeof resPrice === 'object' && resPrice !== null && selectedDuration) {
+        // 嵌套格式：按时长查找附加价
+        cost += (resPrice as Record<string, number>)[selectedDuration] ?? 0;
+      } else if (typeof resPrice === 'number') {
+        // 扁平格式（兼容）
+        cost += resPrice;
+      }
+    }
+    return cost;
+  }, [selectedModel, selectedDuration, selectedResolution]);
+
+  const costCredits = actualCost();
 
   const handleGenerate = useCallback(() => {
     if (!selectedModel) return;
 
     // Check balance
-    if (balance < actualCost) {
+    if (balance < costCredits) {
       setInsufficientDialogOpen(true);
       return;
     }
@@ -73,6 +102,7 @@ export default function WorkspacePage() {
         prompt,
         params: selectedDuration ? { duration: selectedDuration } : {},
         duration: selectedDuration,
+        resolution: selectedResolution,
         referenceImages: refImages,
       },
       {
@@ -82,7 +112,7 @@ export default function WorkspacePage() {
         },
       },
     );
-  }, [selectedModel, prompt, balance, actualCost, selectedDuration, referenceImages, createTaskMutation, poll, refetchBalance]);
+  }, [selectedModel, prompt, balance, costCredits, selectedDuration, selectedResolution, referenceImages, createTaskMutation, poll, refetchBalance]);
 
   const isGenerating = createTaskMutation.isPending || isPolling;
   const canGenerate = selectedModel && prompt.trim().length > 0 && !isGenerating;
@@ -129,7 +159,7 @@ export default function WorkspacePage() {
               onGenerate={handleGenerate}
               disabled={!canGenerate}
               isGenerating={isGenerating}
-              costCredits={actualCost}
+              costCredits={costCredits}
               currentBalance={balance}
               selectedModelName={selectedModel?.name ?? ''}
               selectedModelType={selectedModel?.type}
@@ -137,6 +167,10 @@ export default function WorkspacePage() {
               durationPricing={selectedModel?.durationPricing}
               selectedDuration={selectedDuration}
               onDurationChange={setSelectedDuration}
+              resolutionOptions={selectedModel?.resolutionOptions}
+              resolutionPricing={selectedModel?.resolutionPricing}
+              selectedResolution={selectedResolution}
+              onResolutionChange={setSelectedResolution}
             />
 
             {/* 参考图上传区域 */}
@@ -179,7 +213,7 @@ export default function WorkspacePage() {
         <DialogTitle>积分不足</DialogTitle>
         <DialogContent>
           <Typography>
-            当前积分余额 {balance}，生成此内容需要 {actualCost} 积分。
+            当前积分余额 {balance}，生成此内容需要 {costCredits} 积分。
             请先充值后再试。
           </Typography>
         </DialogContent>

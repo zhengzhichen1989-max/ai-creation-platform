@@ -36,6 +36,8 @@ export class SoraAdapter extends BaseAdapter {
       costCredits: 30,
       durationOptions: [5, 10, 15],
       durationPricing: { "5": 20, "10": 30, "15": 45 },
+      resolutionOptions: null,
+      resolutionPricing: null,
     };
   }
 }

@@ -5,9 +5,10 @@
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import { getDb, saveDatabase } from "../db/index.js";
-import type { AuthResult, UserInfo, JwtPayload, ForgotPasswordResult } from "../types/index.js";
+import type { AuthResult, UserInfo, JwtPayload } from "../types/index.js";
 import { UserExistsError, InvalidCredentialsError, InvalidResetTokenError, SecurityQuestionError } from "../utils/errors.js";
 import { config } from "../config/index.js";
+import { sendPasswordResetEmail } from "./email.service.js";
 
 const BCRYPT_ROUNDS = 10;
 
@@ -171,26 +172,36 @@ export async function resetPassword(token: string, newPassword: string): Promise
   saveDatabase();
 }
 
-/** 忘记密码 - 查询用户是否有安全问题 */
-export function forgotPassword(email: string): ForgotPasswordResult {
+/** 忘记密码 - 发送密码重置邮件 */
+export async function forgotPassword(email: string): Promise<void> {
   const db = getDb();
 
-  const rows = db.exec(
-    "SELECT security_question FROM users WHERE email = ?",
-    [email]
-  );
+  const rows = db.exec("SELECT id FROM users WHERE email = ?", [email]);
 
+  // 无论用户是否存在，都返回成功（防止枚举用户）
   if (rows.length === 0 || rows[0].values.length === 0) {
-    // 用户不存在，仍返回无安全问题（不泄露用户是否存在）
-    return { hasSecurityQuestion: false, question: null };
+    return;
   }
 
-  const question = rows[0].values[0][0] as string | null;
-  if (!question) {
-    return { hasSecurityQuestion: false, question: null };
-  }
+  const userId = rows[0].values[0][0] as number;
 
-  return { hasSecurityQuestion: true, question };
+  // 生成重置Token，30分钟有效
+  const token = uuidv4();
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000)
+    .toISOString()
+    .replace("T", " ")
+    .replace(/\.\d+Z$/, "");
+
+  db.run(
+    "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)",
+    [userId, token, expiresAt]
+  );
+  saveDatabase();
+
+  // 发送邮件（异步，不阻塞响应）
+  sendPasswordResetEmail(email, token).catch((err) => {
+    console.error("[email] 密码重置邮件发送失败:", err.message);
+  });
 }
 
 /** 验证安全问题答案 */

@@ -23,6 +23,15 @@ export class DMXAPIVideoAdapter {
     this.apiKey = config.providers.dmxapi.apiKey;
   }
 
+  /** 根据 resolution 字符串获取宽高 (16:9 横屏默认) */
+  private getResolutionSize(resolution?: string): { width: number; height: number } {
+    if (resolution === "1080p") {
+      return { width: 1920, height: 1080 };
+    }
+    // 默认 720p
+    return { width: 1280, height: 720 };
+  }
+
   /** 将本地路径（如 /uploads/ref_images/xxx.jpg）转为完整URL */
   private toFullUrl(localPath: string): string {
     if (localPath.startsWith("http://") || localPath.startsWith("https://")) {
@@ -65,8 +74,10 @@ export class DMXAPIVideoAdapter {
   private buildSeedanceBody(prompt: string, params?: GenerateParams, referenceImages?: ReferenceImage[]): Record<string, unknown> {
     const duration = params?.duration ?? 5;
     const clampedDuration = Math.max(4, Math.min(15, duration));
-    const width = params?.width ?? 1280;
-    const height = params?.height ?? 720;
+    const resolution = (params?.resolution as string) || "720p";
+    const resSize = this.getResolutionSize(resolution);
+    const width = params?.width ?? resSize.width;
+    const height = params?.height ?? resSize.height;
     let ratio = "16:9";
     if (height > width) {
       ratio = "9:16";
@@ -94,23 +105,32 @@ export class DMXAPIVideoAdapter {
       input,
       duration: clampedDuration,
       ratio,
-      resolution: "720p",
-      generate_audio: false,
+      resolution,
+      generate_audio: true,
     };
   }
 
-  /** 构建 Kling V3 提交请求体 (input是对象格式) */
+  /** 构建 Kling V3 提交请求体 (input是对象格式)
+   *  Kling V3 分辨率与 mode 映射：
+   *    720p → mode: "std"（标准模式）
+   *    1080p → mode: "pro"（高清模式）
+   */
   private buildKlingBody(prompt: string, params?: GenerateParams, referenceImages?: ReferenceImage[]): Record<string, unknown> {
     const duration = params?.duration ?? 5;
     const clampedDuration = Math.max(3, Math.min(15, duration));
-    const width = params?.width ?? 1280;
-    const height = params?.height ?? 720;
+    const resolution = (params?.resolution as string) || "720p";
+    const resSize = this.getResolutionSize(resolution);
+    const width = params?.width ?? resSize.width;
+    const height = params?.height ?? resSize.height;
     let aspectRatio = "16:9";
     if (height > width) {
       aspectRatio = "9:16";
     } else if (width === height) {
       aspectRatio = "1:1";
     }
+
+    // resolution → mode 映射：720p→std, 1080p→pro
+    const mode = resolution === "1080p" ? "pro" : "std";
 
     // 构建 input 对象
     const inputObj: Record<string, unknown> = { prompt };
@@ -138,19 +158,25 @@ export class DMXAPIVideoAdapter {
       input: inputObj,
       parameters: {
         duration: clampedDuration,
-        mode: "std",
+        mode,
         aspect_ratio: aspectRatio,
+        audio: true,
       },
     };
   }
 
-  /** 构建 Sora-2 multipart/form-data 请求 (POST /v1/videos) */
+  /** 构建 Sora-2 multipart/form-data 请求 (POST /v1/videos)
+   *  Sora-2 仅支持 720P：size 参数只接受 "1280x720"(横屏) 或 "720x1280"(竖屏)
+   *  不支持 1080P，忽略 resolution 参数中的 1080p
+   */
   private async submitSoraTask(prompt: string, params?: GenerateParams): Promise<AdapterResult> {
     const duration = params?.duration ?? 4;
     const seconds = [4, 8, 12].includes(duration) ? String(duration) : "4";
+    // Sora-2 只支持720P，size 只接受 "1280x720" 或 "720x1280"
     const width = params?.width ?? 1280;
     const height = params?.height ?? 720;
-    const size = `${width}x${height}`;
+    // 确保不超过720P范围
+    const size = width >= height ? "1280x720" : "720x1280";
 
     // 构建 multipart/form-data
     const boundary = "----DMXAPIFormBoundary" + Date.now();

@@ -80,6 +80,13 @@ export default function LoginPage() {
               }}
             />
 
+            {/* 忘记密码链接 */}
+            <Box sx={{ textAlign: 'right', mt: 0.5 }}>
+              <Link component={RouterLink} to="/forgot-password" variant="body2" underline="hover" color="text.secondary">
+                忘记密码？
+              </Link>
+            </Box>
+
             <Button
               type="submit"
               variant="contained"

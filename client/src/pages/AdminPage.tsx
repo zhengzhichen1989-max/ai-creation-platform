@@ -331,6 +331,8 @@ interface ModelFormData {
   sort_order: string;
   duration_options: string;
   duration_pricing: string;
+  resolution_options: string;
+  resolution_pricing: string;
 }
 
 const defaultModelForm: ModelFormData = {
@@ -345,6 +347,8 @@ const defaultModelForm: ModelFormData = {
   sort_order: '0',
   duration_options: '',
   duration_pricing: '',
+  resolution_options: '',
+  resolution_pricing: '',
 };
 
 const MODEL_TYPES = [
@@ -404,6 +408,8 @@ function ModelManager() {
       sort_order: String(model.sort_order),
       duration_options: model.duration_options || '',
       duration_pricing: model.duration_pricing || '',
+      resolution_options: (model as any).resolution_options || '',
+      resolution_pricing: (model as any).resolution_pricing || '',
     });
     setDialogOpen(true);
   };
@@ -427,6 +433,8 @@ function ModelManager() {
           sort_order: parseInt(form.sort_order, 10),
           duration_options: form.duration_options || null,
           duration_pricing: form.duration_pricing || null,
+          resolution_options: form.resolution_options || null,
+          resolution_pricing: form.resolution_pricing || null,
         };
         await adminUpdateModel(editingId, payload);
         setSnackbar({ open: true, message: '模型更新成功', severity: 'success' });
@@ -443,6 +451,8 @@ function ModelManager() {
           sort_order: parseInt(form.sort_order, 10),
           duration_options: form.duration_options || null,
           duration_pricing: form.duration_pricing || null,
+          resolution_options: form.resolution_options || null,
+          resolution_pricing: form.resolution_pricing || null,
         };
         await adminCreateModel(payload);
         setSnackbar({ open: true, message: '模型创建成功', severity: 'success' });
@@ -634,6 +644,24 @@ function ModelManager() {
             size="small"
             placeholder='{"5":15,"10":25,"15":35}'
             helperText="仅视频模型需要，键为秒数，值为积分"
+          />
+          <TextField
+            label="分辨率选项(JSON数组)"
+            value={form.resolution_options}
+            onChange={(e) => updateForm('resolution_options', e.target.value)}
+            fullWidth
+            size="small"
+            placeholder='["720p","1080p"]'
+            helperText="仅视频模型需要，如 [&quot;720p&quot;,&quot;1080p&quot;]"
+          />
+          <TextField
+            label="分辨率附加定价(JSON对象)"
+            value={form.resolution_pricing}
+            onChange={(e) => updateForm('resolution_pricing', e.target.value)}
+            fullWidth
+            size="small"
+            placeholder='{"720p":0,"1080p":5}'
+            helperText="仅视频模型，叠加在时长定价之上，如 {&quot;720p&quot;:0,&quot;1080p&quot;:5}"
           />
           <TextField
             label="排序权重"

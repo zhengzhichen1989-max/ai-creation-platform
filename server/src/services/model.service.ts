@@ -10,7 +10,7 @@ import { ModelNotFoundError } from "../utils/errors.js";
 export function listModels(type?: ModelType): ModelListItem[] {
   const db = getDb();
 
-  let sql = "SELECT id, name, type, category, cost_credits, config, duration_options, duration_pricing FROM ai_models WHERE enabled = 1";
+  let sql = "SELECT id, name, type, category, cost_credits, config, duration_options, duration_pricing, resolution_options, resolution_pricing FROM ai_models WHERE enabled = 1";
   const params: unknown[] = [];
 
   if (type) {
@@ -34,6 +34,8 @@ export function listModels(type?: ModelType): ModelListItem[] {
         config: row[5] as string | null,
         durationOptions: row[6] ? JSON.parse(row[6] as string) : null,
         durationPricing: row[7] ? JSON.parse(row[7] as string) : null,
+        resolutionOptions: row[8] ? JSON.parse(row[8] as string) : null,
+        resolutionPricing: row[9] ? JSON.parse(row[9] as string) : null,
       });
     }
   }
@@ -45,7 +47,7 @@ export function listModels(type?: ModelType): ModelListItem[] {
 export function getModel(modelId: string): ModelListItem {
   const db = getDb();
   const rows = db.exec(
-    "SELECT id, name, type, category, cost_credits, config, duration_options, duration_pricing FROM ai_models WHERE id = ?",
+    "SELECT id, name, type, category, cost_credits, config, duration_options, duration_pricing, resolution_options, resolution_pricing FROM ai_models WHERE id = ?",
     [modelId]
   );
 
@@ -63,6 +65,8 @@ export function getModel(modelId: string): ModelListItem {
     config: row[5] as string | null,
     durationOptions: row[6] ? JSON.parse(row[6] as string) : null,
     durationPricing: row[7] ? JSON.parse(row[7] as string) : null,
+    resolutionOptions: row[8] ? JSON.parse(row[8] as string) : null,
+    resolutionPricing: row[9] ? JSON.parse(row[9] as string) : null,
   };
 }
 

@@ -54,6 +54,8 @@ const modelCreateSchema = z.object({
   sort_order: z.number().int().optional().default(0),
   duration_options: z.string().optional().nullable(),
   duration_pricing: z.string().optional().nullable(),
+  resolution_options: z.string().optional().nullable(),
+  resolution_pricing: z.string().optional().nullable(),
 });
 
 const modelUpdateSchema = z.object({
@@ -67,6 +69,8 @@ const modelUpdateSchema = z.object({
   sort_order: z.number().int().optional(),
   duration_options: z.string().optional().nullable(),
   duration_pricing: z.string().optional().nullable(),
+  resolution_options: z.string().optional().nullable(),
+  resolution_pricing: z.string().optional().nullable(),
 });
 
 // ---- 用户管理 Zod 校验 Schema ----
@@ -141,8 +145,10 @@ function mapModelRow(row: unknown[]): Record<string, unknown> {
     sort_order: row[8] as number,
     duration_options: row[9] as string | null,
     duration_pricing: row[10] as string | null,
-    created_at: row[11] as string,
-    updated_at: row[12] as string,
+    resolution_options: row[11] as string | null,
+    resolution_pricing: row[12] as string | null,
+    created_at: row[13] as string,
+    updated_at: row[14] as string,
   };
 }
 
@@ -257,7 +263,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.get("/models", async (_request, reply) => {
     const db = getDb();
     const rows = db.exec(
-      "SELECT id, name, type, category, cost_credits, adapter_class, enabled, config, sort_order, duration_options, duration_pricing, created_at, updated_at FROM ai_models ORDER BY sort_order"
+      "SELECT id, name, type, category, cost_credits, adapter_class, enabled, config, sort_order, duration_options, duration_pricing, resolution_options, resolution_pricing, created_at, updated_at FROM ai_models ORDER BY sort_order"
     );
 
     const models: Record<string, unknown>[] = [];
@@ -277,14 +283,14 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const now = nowISO();
 
     db.run(
-      "INSERT INTO ai_models (id, name, type, category, cost_credits, adapter_class, enabled, config, sort_order, duration_options, duration_pricing, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [body.id, body.name, body.type, body.category, body.cost_credits, body.adapter_class, body.enabled, body.config, body.sort_order, body.duration_options, body.duration_pricing, now, now]
+      "INSERT INTO ai_models (id, name, type, category, cost_credits, adapter_class, enabled, config, sort_order, duration_options, duration_pricing, resolution_options, resolution_pricing, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [body.id, body.name, body.type, body.category, body.cost_credits, body.adapter_class, body.enabled, body.config, body.sort_order, body.duration_options, body.duration_pricing, body.resolution_options, body.resolution_pricing, now, now]
     );
 
     saveDatabase();
 
     const rows = db.exec(
-      "SELECT id, name, type, category, cost_credits, adapter_class, enabled, config, sort_order, duration_options, duration_pricing, created_at, updated_at FROM ai_models WHERE id = ?",
+      "SELECT id, name, type, category, cost_credits, adapter_class, enabled, config, sort_order, duration_options, duration_pricing, resolution_options, resolution_pricing, created_at, updated_at FROM ai_models WHERE id = ?",
       [body.id]
     );
 
@@ -319,6 +325,8 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (body.sort_order !== undefined) { fields.push("sort_order = ?"); values.push(body.sort_order); }
     if (body.duration_options !== undefined) { fields.push("duration_options = ?"); values.push(body.duration_options); }
     if (body.duration_pricing !== undefined) { fields.push("duration_pricing = ?"); values.push(body.duration_pricing); }
+    if (body.resolution_options !== undefined) { fields.push("resolution_options = ?"); values.push(body.resolution_options); }
+    if (body.resolution_pricing !== undefined) { fields.push("resolution_pricing = ?"); values.push(body.resolution_pricing); }
 
     if (fields.length > 0) {
       fields.push("updated_at = ?");
@@ -329,7 +337,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const rows = db.exec(
-      "SELECT id, name, type, category, cost_credits, adapter_class, enabled, config, sort_order, duration_options, duration_pricing, created_at, updated_at FROM ai_models WHERE id = ?",
+      "SELECT id, name, type, category, cost_credits, adapter_class, enabled, config, sort_order, duration_options, duration_pricing, resolution_options, resolution_pricing, created_at, updated_at FROM ai_models WHERE id = ?",
       [params.id]
     );
 

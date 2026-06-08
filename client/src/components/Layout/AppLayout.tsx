@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { Box, Toolbar } from '@mui/material';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import CustomerService from '../CustomerService/CustomerService';
 
 const SIDEBAR_WIDTH = 240;
 
@@ -23,6 +24,8 @@ export default function AppLayout() {
           <Outlet />
         </Box>
       </Box>
+      {/* 客服微信悬浮按钮 */}
+      <CustomerService />
     </Box>
   );
 }

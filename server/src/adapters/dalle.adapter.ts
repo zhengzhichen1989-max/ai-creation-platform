@@ -37,6 +37,8 @@ export class DallEAdapter extends BaseAdapter {
       costCredits: 10,
       durationOptions: null,
       durationPricing: null,
+      resolutionOptions: null,
+      resolutionPricing: null,
     };
   }
 }

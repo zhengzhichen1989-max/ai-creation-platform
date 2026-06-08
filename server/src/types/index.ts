@@ -75,6 +75,7 @@ export interface GenerateParams {
   seed?: number;
   duration?: number;
   fps?: number;
+  resolution?: string;
   max_tokens?: number;
   referenceImages?: ReferenceImage[];
   [key: string]: unknown;
@@ -107,6 +108,8 @@ export interface ModelInfo {
   costCredits: number;
   durationOptions: number[] | null;
   durationPricing: Record<string, number> | null;
+  resolutionOptions: string[] | null;
+  resolutionPricing: Record<string, number> | null;
 }
 
 /** 适配器配置 */
@@ -141,6 +144,7 @@ export interface CreateTaskRequest {
   prompt: string;
   params?: GenerateParams;
   duration?: number;
+  resolution?: string;
   referenceImages?: ReferenceImage[];
 }
 
@@ -221,6 +225,8 @@ export interface ModelListItem {
   config: string | null;
   durationOptions: number[] | null;
   durationPricing: Record<string, number> | null;
+  resolutionOptions: string[] | null;
+  resolutionPricing: Record<string, number> | null;
 }
 
 // ---- 管理员用户管理类型 ----

@@ -34,6 +34,7 @@ export interface CreateTaskParams {
   prompt: string;
   params?: Record<string, unknown>;
   duration?: number;
+  resolution?: string;
   referenceImages?: ReferenceImage[];
 }
 

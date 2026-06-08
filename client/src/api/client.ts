@@ -34,7 +34,14 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config;
 
     // If 401 and we haven't retried yet, try refreshing the token
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Skip refresh for auth endpoints (login/register) — their 401 means wrong credentials, not expired token
+    const isAuthEndpoint =
+      originalRequest.url?.includes('/auth/login') ||
+      originalRequest.url?.includes('/auth/register') ||
+      originalRequest.url?.includes('/auth/forgot-password') ||
+      originalRequest.url?.includes('/auth/verify-security-answer');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
 
       const refreshToken = useAuthStore.getState().refreshToken;
@@ -57,7 +64,7 @@ apiClient.interceptors.response.use(
       }
     }
 
-    // Show error toast for non-401 errors
+    // Show error toast (for non-401 errors, auth endpoint 401s, and retried 401s)
     const message =
       error.response?.data?.message || error.message || '请求失败，请稍后重试';
     useSnackbarStore.getState().showSnackbar(message, 'error');

@@ -10,6 +10,8 @@ export interface AIModel {
   config: string | null;
   durationOptions: number[] | null;
   durationPricing: Record<string, number> | null;
+  resolutionOptions: string[] | null;
+  resolutionPricing: Record<string, number | Record<string, number>> | null;
 }
 
 /** List all available models, optionally filtered by type */

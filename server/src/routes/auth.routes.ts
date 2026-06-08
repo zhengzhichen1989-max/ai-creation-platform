@@ -83,11 +83,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     reply.send(successResponse({ message: "密码重置成功" }));
   });
 
-  /** POST /api/v1/auth/forgot-password - 忘记密码查询安全问题（公开） */
+  /** POST /api/v1/auth/forgot-password - 发送密码重置邮件（公开） */
   app.post("/forgot-password", async (request, reply) => {
     const body = forgotPasswordSchema.parse(request.body);
-    const result = authService.forgotPassword(body.email);
-    reply.send(successResponse(result));
+    await authService.forgotPassword(body.email);
+    // 无论用户是否存在，均返回相同提示，防止用户枚举攻击
+    reply.send(successResponse({ message: "如果该邮箱已注册，重置链接已发送，请查收邮件" }));
   });
 
   /** POST /api/v1/auth/verify-security-answer - 验证安全问题答案（公开） */
