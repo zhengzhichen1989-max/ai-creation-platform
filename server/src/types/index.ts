@@ -33,9 +33,10 @@ export interface AuthResult {
 /** 用户信息（不含密码） */
 export interface UserInfo {
   id: number;
-  email: string;
+  email: string | null;
   nickname: string;
   avatarUrl: string | null;
+  phone: string | null;
   role: string;
 }
 
@@ -166,6 +167,7 @@ export interface CreditsPackageInfo {
   credits: number;
   priceCents: number;
   unitLabel: string | null;
+  maxPerUser: number | null;
 }
 
 /** 积分流水 */

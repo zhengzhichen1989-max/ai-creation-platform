@@ -45,9 +45,9 @@ export async function createOrder(
 ): Promise<{ orderId: string; codeUrl: string }> {
   const db = getDb();
 
-  // 1. 查找积分包信息
+  // 1. 查找积分包信息（含限购字段）
   const pkgRows = db.exec(
-    "SELECT id, name, credits, price_cents FROM credit_packages WHERE id = ? AND enabled = 1",
+    "SELECT id, name, credits, price_cents, max_per_user FROM credit_packages WHERE id = ? AND enabled = 1",
     [packageId]
   );
 
@@ -59,6 +59,19 @@ export async function createOrder(
   const pkgName = pkgRow[1] as string;
   const pkgCredits = pkgRow[2] as number;
   const pkgPriceCents = pkgRow[3] as number;
+  const maxPerUser = pkgRow[4] as number | null;
+
+  // 1.5 检查每人限购次数
+  if (maxPerUser !== null && maxPerUser > 0) {
+    const purchaseCountRows = db.exec(
+      "SELECT COUNT(*) as cnt FROM orders WHERE user_id = ? AND package_id = ? AND status = 'paid'",
+      [userId, packageId]
+    );
+    const purchaseCount = purchaseCountRows[0]?.values[0]?.[0] as number || 0;
+    if (purchaseCount >= maxPerUser) {
+      throw new Error(`该套餐每人限购${maxPerUser}次，您已达到购买上限`);
+    }
+  }
 
   // 2. 检查用户是否有未过期的同积分包pending订单，避免重复创建
   const existingRows = db.exec(

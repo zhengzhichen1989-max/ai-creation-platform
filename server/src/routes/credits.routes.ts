@@ -28,7 +28,7 @@ export async function creditsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/packages", { preHandler: authMiddleware }, async (request, reply) => {
     const db = getDb();
     const rows = db.exec(
-      "SELECT id, name, credits, price_cents, unit_label FROM credit_packages WHERE enabled = 1 ORDER BY sort_order"
+      "SELECT id, name, credits, price_cents, unit_label, max_per_user FROM credit_packages WHERE enabled = 1 ORDER BY sort_order"
     );
 
     const packages: CreditsPackageInfo[] = [];
@@ -40,6 +40,7 @@ export async function creditsRoutes(app: FastifyInstance): Promise<void> {
           credits: row[2] as number,
           priceCents: row[3] as number,
           unitLabel: row[4] as string | null,
+          maxPerUser: row[5] as number | null,
         });
       }
     }

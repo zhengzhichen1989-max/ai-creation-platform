@@ -95,6 +95,7 @@ export async function runMigration(): Promise<void> {
       unit_label TEXT,
       enabled INTEGER NOT NULL DEFAULT 1,
       sort_order INTEGER DEFAULT 0,
+      max_per_user INTEGER,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `;
@@ -213,6 +214,14 @@ export async function runMigration(): Promise<void> {
     console.log("[Migration] users.security_answer_hash 字段已存在，跳过迁移");
   }
 
+  // 为 credit_packages 表添加 max_per_user 字段（NULL=无限，N=每人限购N次）
+  try {
+    sqlite.run("ALTER TABLE credit_packages ADD COLUMN max_per_user INTEGER");
+    console.log("[Migration] 已为 credit_packages 表添加 max_per_user 字段");
+  } catch {
+    console.log("[Migration] credit_packages.max_per_user 字段已存在，跳过迁移");
+  }
+
   // 插入种子数据：管理员账户
   const adminCountResult = sqlite.exec("SELECT COUNT(*) as cnt FROM users WHERE email = ?", ["admin@aicreation.com"]);
   const adminCount = adminCountResult[0]?.values[0]?.[0] as number || 0;
@@ -279,8 +288,16 @@ export async function runMigration(): Promise<void> {
         [p.id, p.name, p.credits, p.price_cents, p.unit_label, p.enabled, p.sort_order]
       );
     }
-    console.log("[Migration] 积分包种子数据插入完成（4条）");
+    console.log("[Migration] 积分包种子数据插入完成（3条）");
   }
+
+  // 确保「首充特惠」套餐存在（每人限购1次）
+  sqlite.run(
+    `INSERT OR REPLACE INTO credit_packages (id, name, credits, price_cents, unit_label, enabled, sort_order, max_per_user)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ["first_charge", "首充特惠", 100, 990, "约0.10元/积分，限购1次", 1, 0, 1]
+  );
+  console.log("[Migration] 首充特惠套餐 UPSERT 完成");
 
   // 新建 orders 表（微信支付订单表）
   sqlite.run(`
@@ -299,6 +316,118 @@ export async function runMigration(): Promise<void> {
     )
   `);
   console.log("[Migration] orders 表创建完成");
+
+  // ============================================================
+  // 手机号验证码登录模块迁移
+  // ============================================================
+
+  // users 表添加 phone 字段（可为空，兼容邮箱注册用户）
+  try {
+    sqlite.run("ALTER TABLE users ADD COLUMN phone TEXT");
+    console.log("[Migration] 已为 users 表添加 phone 字段");
+  } catch {
+    console.log("[Migration] users.phone 字段已存在，跳过迁移");
+  }
+
+  // 新建 sms_codes 表
+  sqlite.run(`
+    CREATE TABLE IF NOT EXISTS sms_codes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      phone TEXT NOT NULL,
+      code TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      used INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  // 为 sms_codes 添加索引加速查询
+  try {
+    sqlite.run("CREATE INDEX IF NOT EXISTS idx_sms_codes_phone ON sms_codes(phone)");
+  } catch {
+    // 索引已存在
+  }
+  console.log("[Migration] sms_codes 表创建完成");
+
+  // ============================================================
+  // 种草视频模块迁移
+  // ============================================================
+
+  // 新建 shouzuo_sessions 表
+  sqlite.run(`
+    CREATE TABLE IF NOT EXISTS shouzuo_sessions (
+      id                    TEXT    PRIMARY KEY,
+      user_id               INTEGER NOT NULL REFERENCES users(id),
+      style_template        TEXT    NOT NULL,
+      video_model           TEXT    NOT NULL,
+      video_duration        INTEGER NOT NULL DEFAULT 5,
+      product_images        TEXT    NOT NULL,
+      storyboard_task_ids   TEXT,
+      storyboard_urls       TEXT,
+      video_task_id         TEXT,
+      video_url             TEXT,
+      copywriting_task_id   TEXT,
+      copywriting_urls      TEXT,
+      status                TEXT    NOT NULL DEFAULT 'draft',
+      total_cost            INTEGER NOT NULL DEFAULT 0,
+      error_message         TEXT,
+      created_at            TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at            TEXT    NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  console.log("[Migration] shouzuo_sessions 表创建完成");
+
+  // 为 shouzuo_sessions 添加索引
+  try {
+    sqlite.run("CREATE INDEX IF NOT EXISTS idx_shouzuo_sessions_user ON shouzuo_sessions(user_id)");
+    sqlite.run("CREATE INDEX IF NOT EXISTS idx_shouzuo_sessions_status ON shouzuo_sessions(status)");
+  } catch {
+    // 索引已存在
+  }
+  console.log("[Migration] shouzuo_sessions 索引创建完成");
+
+  // ============================================================
+  // 种草视频模块增量迁移 — 添加新列
+  // ============================================================
+
+  // 添加 product_info 列（JSON: ShouzuoProductInfo）
+  try {
+    sqlite.run("ALTER TABLE shouzuo_sessions ADD COLUMN product_info TEXT");
+    console.log("[Migration] 已为 shouzuo_sessions 表添加 product_info 字段");
+  } catch {
+    console.log("[Migration] shouzuo_sessions.product_info 字段已存在，跳过迁移");
+  }
+
+  // 添加 image_analysis 列（JSON: ShouzuoImageAnalysis）
+  try {
+    sqlite.run("ALTER TABLE shouzuo_sessions ADD COLUMN image_analysis TEXT");
+    console.log("[Migration] 已为 shouzuo_sessions 表添加 image_analysis 字段");
+  } catch {
+    console.log("[Migration] shouzuo_sessions.image_analysis 字段已存在，跳过迁移");
+  }
+
+  // 添加 showcase_task_ids 列（JSON array）
+  try {
+    sqlite.run("ALTER TABLE shouzuo_sessions ADD COLUMN showcase_task_ids TEXT");
+    console.log("[Migration] 已为 shouzuo_sessions 表添加 showcase_task_ids 字段");
+  } catch {
+    console.log("[Migration] shouzuo_sessions.showcase_task_ids 字段已存在，跳过迁移");
+  }
+
+  // 添加 showcase_urls 列（JSON array）
+  try {
+    sqlite.run("ALTER TABLE shouzuo_sessions ADD COLUMN showcase_urls TEXT");
+    console.log("[Migration] 已为 shouzuo_sessions 表添加 showcase_urls 字段");
+  } catch {
+    console.log("[Migration] shouzuo_sessions.showcase_urls 字段已存在，跳过迁移");
+  }
+
+  // 添加 frame_count 列
+  try {
+    sqlite.run("ALTER TABLE shouzuo_sessions ADD COLUMN frame_count INTEGER NOT NULL DEFAULT 5");
+    console.log("[Migration] 已为 shouzuo_sessions 表添加 frame_count 字段");
+  } catch {
+    console.log("[Migration] shouzuo_sessions.frame_count 字段已存在，跳过迁移");
+  }
 
   // 保存到文件
   saveDatabase();

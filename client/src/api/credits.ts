@@ -12,6 +12,7 @@ export interface CreditPackage {
   credits: number;
   priceCents: number;
   unitLabel: string | null;
+  maxPerUser: number | null;
 }
 
 export interface CreditTransaction {
