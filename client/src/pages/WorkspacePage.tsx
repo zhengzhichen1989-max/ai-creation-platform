@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Box, Grid, Paper, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, Alert } from '@mui/material';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import { ModelSelector } from '@/components/ModelSelector/ModelSelector';
-import { PromptInput } from '@/components/PromptInput/PromptInput';
+import { PromptInput, IMAGE_SIZE_PRESETS } from '@/components/PromptInput/PromptInput';
 import { ImageUpload } from '@/components/ImageUpload/ImageUpload';
 import type { UploadedReferenceImage } from '@/components/ImageUpload/ImageUpload';
 import { ImageResult } from '@/components/ResultViewer/ImageResult';
@@ -22,6 +22,7 @@ export default function WorkspacePage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('image');
   const [selectedDuration, setSelectedDuration] = useState<number | undefined>(undefined);
   const [selectedResolution, setSelectedResolution] = useState<string | undefined>(undefined);
+  const [selectedImageSizeIndex, setSelectedImageSizeIndex] = useState(0);
   const [referenceImages, setReferenceImages] = useState<UploadedReferenceImage[]>([]);
 
   const createTaskMutation = useCreateTask();
@@ -56,6 +57,10 @@ export default function WorkspacePage() {
     } else {
       setSelectedDuration(undefined);
       setSelectedResolution(undefined);
+    }
+    // 图片模型：重置尺寸为默认 1:1
+    if (selectedModel?.type === 'image') {
+      setSelectedImageSizeIndex(0);
     }
     // 模型切换时清空参考图
     setReferenceImages([]);
@@ -107,11 +112,20 @@ export default function WorkspacePage() {
       ? referenceImages.map(img => ({ url: img.url, role: img.role }))
       : undefined;
 
+    // 构建通用参数
+    const params: Record<string, unknown> = {};
+    if (selectedDuration) params.duration = selectedDuration;
+    if (selectedModel.type === 'image') {
+      const preset = IMAGE_SIZE_PRESETS[selectedImageSizeIndex];
+      params.width = preset.width;
+      params.height = preset.height;
+    }
+
     createTaskMutation.mutate(
       {
         modelId: selectedModel.id,
         prompt,
-        params: selectedDuration ? { duration: selectedDuration } : {},
+        params,
         duration: selectedDuration,
         resolution: selectedResolution,
         referenceImages: refImages,
@@ -132,7 +146,7 @@ export default function WorkspacePage() {
         },
       },
     );
-  }, [selectedModel, prompt, balance, costCredits, selectedDuration, selectedResolution, referenceImages, createTaskMutation, poll, refetchBalance]);
+  }, [selectedModel, prompt, balance, costCredits, selectedDuration, selectedResolution, selectedImageSizeIndex, referenceImages, createTaskMutation, poll, refetchBalance]);
 
   const isGenerating = createTaskMutation.isPending || isPolling;
   const canGenerate = selectedModel && prompt.trim().length > 0 && !isGenerating;
@@ -197,6 +211,8 @@ export default function WorkspacePage() {
               resolutionPricing={selectedModel?.resolutionPricing}
               selectedResolution={selectedResolution}
               onResolutionChange={setSelectedResolution}
+              selectedImageSizeIndex={selectedImageSizeIndex}
+              onImageSizeChange={setSelectedImageSizeIndex}
             />
 
             {/* 参考图上传区域 */}

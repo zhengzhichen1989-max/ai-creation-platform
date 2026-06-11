@@ -47,9 +47,9 @@ function getAvailableRoles(modelId: string | null, modelType?: 'image' | 'video'
     return [];
   }
 
-  // 图片模型：gpt-image-2 支持编辑源图，nano-banana 和 flux-pro 支持参考图
+  // 图片模型：gpt-image-2 / gpt-image-2-vip 支持编辑源图，nano-banana 和 flux-pro 支持参考图
   if (modelType === 'image') {
-    if (modelId === 'gpt-image-2') {
+    if (modelId === 'gpt-image-2' || modelId === 'gpt-image-2-vip') {
       return [{ role: 'edit_source', label: '编辑源图' }];
     }
     // nano-banana 和 flux-pro 支持参考图（图生图）

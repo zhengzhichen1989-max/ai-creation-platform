@@ -1,6 +1,17 @@
 import { TextField, Button, Box, Typography, ToggleButtonGroup, ToggleButton } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 
+/** 图片尺寸预设 */
+export const IMAGE_SIZE_PRESETS = [
+  { label: '1:1 方形', width: 1024, height: 1024 },
+  { label: '16:9 横屏', width: 1792, height: 1024 },
+  { label: '9:16 竖屏', width: 1024, height: 1792 },
+  { label: '4:3 横屏', width: 1365, height: 1024 },
+  { label: '3:4 竖屏', width: 1024, height: 1365 },
+] as const;
+
+export type ImageSizePreset = typeof IMAGE_SIZE_PRESETS[number];
+
 interface PromptInputProps {
   value: string;
   onChange: (value: string) => void;
@@ -19,6 +30,9 @@ interface PromptInputProps {
   resolutionPricing?: Record<string, number | Record<string, number>> | null;
   selectedResolution?: string;
   onResolutionChange?: (resolution: string) => void;
+  /** 图片模型选中的尺寸预设索引 */
+  selectedImageSizeIndex?: number;
+  onImageSizeChange?: (index: number) => void;
 }
 
 const MAX_PROMPT_LENGTH = 2000;
@@ -41,6 +55,8 @@ export function PromptInput({
   resolutionPricing,
   selectedResolution,
   onResolutionChange,
+  selectedImageSizeIndex = 0,
+  onImageSizeChange,
 }: PromptInputProps) {
   const insufficient = costCredits > 0 && currentBalance < costCredits;
 
@@ -113,6 +129,24 @@ export function PromptInput({
               </ToggleButtonGroup>
             </Box>
           )}
+        </Box>
+      )}
+
+      {selectedModelType === 'image' && (
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ mb: 0.5 }}>图片尺寸</Typography>
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={selectedImageSizeIndex}
+            onChange={(_, val) => val !== null && onImageSizeChange?.(val)}
+          >
+            {IMAGE_SIZE_PRESETS.map((preset, idx) => (
+              <ToggleButton key={idx} value={idx}>
+                {preset.label}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
         </Box>
       )}
 
