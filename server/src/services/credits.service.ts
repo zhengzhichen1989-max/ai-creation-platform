@@ -232,13 +232,36 @@ export function adminTopup(
   const db = getDb();
   const fullDescription = `管理员充值: ${adminEmail} - ${description}`;
 
-  for (let retry = 0; retry < MAX_RETRIES; retry++) {
-    const rows = db.exec("SELECT balance, version FROM credit_accounts WHERE user_id = ?", [userId]);
-    if (rows.length === 0 || rows[0].values.length === 0) {
-      throw new Error("积分账户不存在");
-    }
+  // 检查用户是否存在对应的积分账户；若不存在则自动创建
+  const accountRows = db.exec("SELECT balance, version FROM credit_accounts WHERE user_id = ?", [userId]);
+  if (accountRows.length === 0 || accountRows[0].values.length === 0) {
+    db.run(
+      "INSERT INTO credit_accounts (user_id, balance, version, created_at, updated_at) VALUES (?, ?, ?, datetime('now'), datetime('now'))",
+      [userId, amount, 1]
+    );
+    db.run(
+      "INSERT INTO credit_transactions (user_id, type, amount, balance_after, reference_id, description) VALUES (?, 'admin_topup', ?, ?, ?, ?)",
+      [userId, amount, amount, null, fullDescription]
+    );
+    const lastIdResult = db.exec("SELECT last_insert_rowid()");
+    const lastId = lastIdResult[0].values[0][0] as number;
 
-    const account = rows[0].values[0];
+    saveDatabase();
+
+    return {
+      id: lastId,
+      userId,
+      type: "admin_topup",
+      amount,
+      balanceAfter: amount,
+      referenceId: null,
+      description: fullDescription,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  for (let retry = 0; retry < MAX_RETRIES; retry++) {
+    const account = accountRows[0].values[0];
     const balance = account[0] as number;
     const version = account[1] as number;
 
