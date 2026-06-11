@@ -1,6 +1,7 @@
 import { Box, CardMedia, Typography, Button } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import type { GenerationTask } from '@/api/tasks';
+import { getMediaUrl } from '@/utils/mediaUrl';
 
 interface ImageResultProps {
   task: GenerationTask;
@@ -17,6 +18,8 @@ export function ImageResult({ task }: ImageResultProps) {
     );
   }
 
+  const displayUrl = getMediaUrl(resultUrl) || resultUrl;
+
   return (
     <Box>
       <Box
@@ -31,7 +34,7 @@ export function ImageResult({ task }: ImageResultProps) {
       >
         <CardMedia
           component="img"
-          image={resultUrl}
+          image={displayUrl}
           alt={task.prompt}
           sx={{
             maxHeight: 512,
@@ -47,7 +50,7 @@ export function ImageResult({ task }: ImageResultProps) {
       <Button
         variant="outlined"
         startIcon={<DownloadIcon />}
-        href={resultUrl}
+        href={displayUrl}
         download
         size="small"
       >

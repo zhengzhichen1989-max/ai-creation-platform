@@ -6,20 +6,27 @@ import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import { getDb, saveDatabase } from "../db/index.js";
 import type { AuthResult, UserInfo, JwtPayload } from "../types/index.js";
-import { UserExistsError, InvalidCredentialsError, InvalidResetTokenError, SecurityQuestionError } from "../utils/errors.js";
+import { UserExistsError, InvalidCredentialsError, InvalidResetTokenError, SecurityQuestionError, PhoneExistsError } from "../utils/errors.js";
 import { config } from "../config/index.js";
 import { sendPasswordResetEmail } from "./email.service.js";
+import { verifySmsCode } from "./sms.service.js";
 
 const BCRYPT_ROUNDS = 10;
 
-/** 用户注册 */
-export async function register(email: string, password: string, nickname: string): Promise<AuthResult> {
+/** 用户注册（需已完成短信验证） */
+export async function register(email: string, password: string, nickname: string, phone: string): Promise<AuthResult> {
   const db = getDb();
 
   // 检查邮箱是否已注册
   const existingRows = db.exec("SELECT id FROM users WHERE email = ?", [email]);
   if (existingRows.length > 0 && existingRows[0].values.length > 0) {
     throw new UserExistsError(email);
+  }
+
+  // 检查手机号是否已被绑定
+  const phoneRows = db.exec("SELECT id FROM users WHERE phone = ?", [phone]);
+  if (phoneRows.length > 0 && phoneRows[0].values.length > 0) {
+    throw new PhoneExistsError(phone);
   }
 
   // 哈希密码
@@ -29,8 +36,8 @@ export async function register(email: string, password: string, nickname: string
   db.run("BEGIN TRANSACTION");
   try {
     db.run(
-      "INSERT INTO users (email, password_hash, nickname, role) VALUES (?, ?, ?, ?)",
-      [email, passwordHash, nickname, "user"]
+      "INSERT INTO users (email, password_hash, nickname, phone, role) VALUES (?, ?, ?, ?, ?)",
+      [email, passwordHash, nickname, phone, "user"]
     );
 
     const userIdResult = db.exec("SELECT last_insert_rowid() as id");
@@ -49,13 +56,12 @@ export async function register(email: string, password: string, nickname: string
   }
 
   // 获取新创建的用户
-  const userRows = db.exec("SELECT id, email, nickname, avatar_url, role FROM users WHERE email = ?", [email]);
+  const userRows = db.exec("SELECT id, email, nickname, avatar_url, phone, role FROM users WHERE email = ?", [email]);
   const user = userRows[0].values[0];
 
   saveDatabase();
 
-  // 生成 Token
-  const { accessToken, refreshToken } = generateTokens(user[0] as number, user[1] as string, user[4] as string);
+  const { accessToken, refreshToken } = generateTokens(user[0] as number, user[1] as string, user[5] as string);
 
   return {
     user: {
@@ -63,7 +69,8 @@ export async function register(email: string, password: string, nickname: string
       email: user[1] as string,
       nickname: user[2] as string,
       avatarUrl: user[3] as string | null,
-      role: user[4] as string,
+      phone: user[4] as string | null,
+      role: user[5] as string,
     },
     accessToken,
     refreshToken,
@@ -75,13 +82,13 @@ export async function login(email: string, password: string): Promise<AuthResult
   const db = getDb();
 
   // 查找用户
-  const rows = db.exec("SELECT id, email, nickname, avatar_url, password_hash, role FROM users WHERE email = ?", [email]);
+  const rows = db.exec("SELECT id, email, nickname, avatar_url, phone, password_hash, role FROM users WHERE email = ?", [email]);
   if (rows.length === 0 || rows[0].values.length === 0) {
     throw new InvalidCredentialsError();
   }
 
   const user = rows[0].values[0];
-  const passwordHash = user[4] as string;
+  const passwordHash = user[5] as string;
 
   // 验证密码
   const passwordMatch = await bcrypt.compare(password, passwordHash);
@@ -90,7 +97,7 @@ export async function login(email: string, password: string): Promise<AuthResult
   }
 
   // 生成 Token
-  const { accessToken, refreshToken } = generateTokens(user[0] as number, user[1] as string, user[5] as string);
+  const { accessToken, refreshToken } = generateTokens(user[0] as number, user[1] as string, user[6] as string);
 
   return {
     user: {
@@ -98,10 +105,74 @@ export async function login(email: string, password: string): Promise<AuthResult
       email: user[1] as string,
       nickname: user[2] as string,
       avatarUrl: user[3] as string | null,
-      role: user[5] as string,
+      phone: user[4] as string | null,
+      role: user[6] as string,
     },
     accessToken,
     refreshToken,
+  };
+}
+
+/** 手机验证码登录（自动注册） */
+export async function phoneLogin(phone: string, code: string): Promise<AuthResult> {
+  // 验证验证码
+  if (!verifySmsCode(phone, code)) {
+    throw new InvalidCredentialsError("验证码错误或已过期");
+  }
+
+  const db = getDb();
+
+  // 查找已有用户
+  const existing = db.exec("SELECT id, email, nickname, avatar_url, phone, role FROM users WHERE phone = ?", [phone]);
+  let user: any[];
+
+  if (existing.length > 0 && existing[0].values.length > 0) {
+    user = existing[0].values[0];
+  } else {
+    // 新用户：自动注册
+    const nickname = `用户${phone.slice(-4)}`;
+    db.run("BEGIN TRANSACTION");
+    try {
+      db.run(
+        "INSERT INTO users (email, password_hash, nickname, phone, role) VALUES (?, ?, ?, ?, ?)",
+        [null, "", nickname, phone, "user"]
+      );
+      const userIdResult = db.exec("SELECT last_insert_rowid() as id");
+      const userId = userIdResult[0].values[0][0] as number;
+
+      // 创建积分账户，赠送30积分
+      db.run(
+        "INSERT INTO credit_accounts (user_id, balance, version) VALUES (?, 30, 0)",
+        [userId]
+      );
+      db.run("COMMIT");
+
+      user = [userId, null, nickname, null, phone, "user"];
+    } catch (err) {
+      db.run("ROLLBACK");
+      throw err;
+    }
+  }
+
+  saveDatabase();
+
+  const userId = user[0] as number;
+  const email = (user[1] as string) || phone; // 用手机号代替邮箱用于JWT
+  const role = user[5] as string;
+
+  const tokens = generateTokens(userId, email, role);
+
+  return {
+    user: {
+      id: userId,
+      email: user[1] as string | null,
+      nickname: user[2] as string,
+      avatarUrl: user[3] as string | null,
+      phone: user[4] as string | null,
+      role,
+    },
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
   };
 }
 
@@ -114,17 +185,18 @@ export function refreshTokens(refreshToken: string): { accessToken: string; refr
 /** 获取用户信息 */
 export function getUserById(userId: number): UserInfo {
   const db = getDb();
-  const rows = db.exec("SELECT id, email, nickname, avatar_url, role FROM users WHERE id = ?", [userId]);
+  const rows = db.exec("SELECT id, email, nickname, avatar_url, phone, role FROM users WHERE id = ?", [userId]);
   if (rows.length === 0 || rows[0].values.length === 0) {
     throw new InvalidCredentialsError("用户不存在");
   }
   const user = rows[0].values[0];
   return {
     id: user[0] as number,
-    email: user[1] as string,
+    email: user[1] as string | null,
     nickname: user[2] as string,
     avatarUrl: user[3] as string | null,
-    role: user[4] as string,
+    phone: user[4] as string | null,
+    role: user[5] as string,
   };
 }
 

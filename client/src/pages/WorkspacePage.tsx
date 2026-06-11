@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Box, Grid, Paper, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { Box, Grid, Paper, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, Alert } from '@mui/material';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import { ModelSelector } from '@/components/ModelSelector/ModelSelector';
 import { PromptInput } from '@/components/PromptInput/PromptInput';
@@ -29,8 +29,16 @@ export default function WorkspacePage() {
   const { data: balanceData, refetch: refetchBalance } = useBalance();
 
   const [insufficientDialogOpen, setInsufficientDialogOpen] = useState(false);
+  const [moderationError, setModerationError] = useState<string | null>(null);
 
   const balance = balanceData?.balance ?? 0;
+
+  // 用户修改 prompt 时清除审核错误
+  useEffect(() => {
+    if (prompt && moderationError) {
+      setModerationError(null);
+    }
+  }, [prompt]);
 
   // 当 selectedModel 变化时重置 duration、resolution 和参考图
   useEffect(() => {
@@ -85,6 +93,9 @@ export default function WorkspacePage() {
   const handleGenerate = useCallback(() => {
     if (!selectedModel) return;
 
+    // 清除之前的错误
+    setModerationError(null);
+
     // Check balance
     if (balance < costCredits) {
       setInsufficientDialogOpen(true);
@@ -110,6 +121,15 @@ export default function WorkspacePage() {
           poll(data.id, selectedModel.type as 'image' | 'video' | 'text');
           refetchBalance();
         },
+        onError: (error: unknown) => {
+          // 检查是否为内容审核拦截
+          const errObj = error as { response?: { data?: { error?: string; errorCode?: string } }; message?: string };
+          const errorCode = errObj?.response?.data?.errorCode;
+          const errorMsg = errObj?.response?.data?.error || errObj?.message || '';
+          if (errorCode === 'CONTENT_MODERATION_FAILED') {
+            setModerationError(errorMsg || '该提示词包含违规内容，无法生成');
+          }
+        },
       },
     );
   }, [selectedModel, prompt, balance, costCredits, selectedDuration, selectedResolution, referenceImages, createTaskMutation, poll, refetchBalance]);
@@ -134,7 +154,7 @@ export default function WorkspacePage() {
   return (
     <Box>
       <Typography variant="h5" sx={{ mb: 3 }}>
-        AI创作工作台
+        AI创作工作台 · 智影工厂
       </Typography>
 
       <Grid container spacing={3}>
@@ -153,6 +173,12 @@ export default function WorkspacePage() {
         {/* Right panel: Prompt + Upload + Result */}
         <Grid item xs={12} md={8}>
           <Paper sx={{ p: 3, mb: 3 }}>
+            {/* 内容审核违规提示 */}
+            {moderationError && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setModerationError(null)}>
+                {moderationError}
+              </Alert>
+            )}
             <PromptInput
               value={prompt}
               onChange={setPrompt}

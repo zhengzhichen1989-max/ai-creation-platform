@@ -7,6 +7,8 @@ import type { QueueJobData, QueueProcessor } from "./index.js";
 import * as taskService from "../services/task.service.js";
 import * as creditsService from "../services/credits.service.js";
 import { downloadIfExternal } from "../utils/download.js";
+import { assertPromptSafe } from "../services/content-moderation.service.js";
+import { translateError } from "../utils/errors.js";
 import type { GenerateParams, AdapterResult, TaskStatusResult, ReferenceImage } from "../types/index.js";
 
 /** 适配器注册表：按模型ID路由到对应适配器（使用DMXAPI真实模型ID） */
@@ -24,6 +26,9 @@ export const videoProcessor: QueueProcessor = async (job: QueueJobData): Promise
   console.log(`[VideoWorker] 开始处理任务: ${taskId}, 模型: ${modelId}, 参考图: ${referenceImages?.length ?? 0}`);
 
   try {
+    // 0. 内容安全审核（最后防线）
+    await assertPromptSafe(prompt);
+
     // 1. 更新任务状态为 processing
     taskService.updateTaskStatus(taskId, "processing", { progress: 5 });
 
@@ -76,8 +81,9 @@ export const videoProcessor: QueueProcessor = async (job: QueueJobData): Promise
       throw new Error("视频生成超时");
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "视频生成失败";
-    console.error(`[VideoWorker] 任务失败: ${taskId}, 错误: ${errorMessage}`);
+    const rawError = error instanceof Error ? error.message : "视频生成失败";
+    const errorMessage = translateError(rawError);
+    console.error(`[VideoWorker] 任务失败: ${taskId}, 原始错误: ${rawError}${rawError !== errorMessage ? ` → 用户提示: ${errorMessage}` : ""}`);
 
     // 更新任务状态为失败
     taskService.updateTaskStatus(taskId, "failed", {

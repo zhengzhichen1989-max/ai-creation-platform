@@ -8,8 +8,11 @@ import HistoryPage from '@/pages/HistoryPage';
 import CreditsPage from '@/pages/CreditsPage';
 import ProfilePage from '@/pages/ProfilePage';
 import AdminPage from '@/pages/AdminPage';
+import ShouzuoVideoPage from '@/pages/ShouzuoVideoPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
+import TermsPage from '@/pages/TermsPage';
+import PrivacyPage from '@/pages/PrivacyPage';
 import type { ReactNode } from 'react';
 
 /** Route guard that redirects unauthenticated users to login */
@@ -79,6 +82,7 @@ export default function AppRouter() {
       >
         <Route index element={<Navigate to="/workspace" replace />} />
         <Route path="workspace" element={<WorkspacePage />} />
+        <Route path="shouzuo-video" element={<ShouzuoVideoPage />} />
         <Route path="history" element={<HistoryPage />} />
         <Route path="credits" element={<CreditsPage />} />
         <Route path="profile" element={<ProfilePage />} />
@@ -91,6 +95,10 @@ export default function AppRouter() {
           }
         />
       </Route>
+
+      {/* 服务协议 & 隐私政策 */}
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/workspace" replace />} />

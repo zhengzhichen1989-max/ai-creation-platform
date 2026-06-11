@@ -6,6 +6,8 @@ import { DMXAPITextAdapter } from "../adapters/dmxapi-text.adapter.js";
 import type { QueueJobData, QueueProcessor } from "./index.js";
 import * as taskService from "../services/task.service.js";
 import * as creditsService from "../services/credits.service.js";
+import { assertPromptSafe } from "../services/content-moderation.service.js";
+import { translateError } from "../utils/errors.js";
 import type { GenerateParams } from "../types/index.js";
 
 /** 适配器注册表：按模型ID路由到对应适配器（使用DMXAPI真实模型ID） */
@@ -21,6 +23,9 @@ export const textProcessor: QueueProcessor = async (job: QueueJobData): Promise<
   console.log(`[TextWorker] 开始处理任务: ${taskId}, 模型: ${modelId}`);
 
   try {
+    // 0. 内容安全审核（最后防线）
+    await assertPromptSafe(prompt);
+
     // 1. 更新任务状态为 processing
     taskService.updateTaskStatus(taskId, "processing", { progress: 20 });
 
@@ -53,8 +58,9 @@ export const textProcessor: QueueProcessor = async (job: QueueJobData): Promise<
       throw new Error(result.errorMessage || "文案生成失败");
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "文案生成失败";
-    console.error(`[TextWorker] 任务失败: ${taskId}, 错误: ${errorMessage}`);
+    const rawError = error instanceof Error ? error.message : "文案生成失败";
+    const errorMessage = translateError(rawError);
+    console.error(`[TextWorker] 任务失败: ${taskId}, 原始错误: ${rawError}${rawError !== errorMessage ? ` → 用户提示: ${errorMessage}` : ""}`);
 
     // 更新任务状态为失败
     taskService.updateTaskStatus(taskId, "failed", {

@@ -121,15 +121,50 @@ export function PromptInput({
           {value.length} / {MAX_PROMPT_LENGTH}
         </Typography>
 
-        <Button
-          variant="contained"
-          size="large"
-          startIcon={<AutoAwesomeIcon />}
+        {/* 使用原生 button 替代 MUI Button，避免 MUI 内部 CSS/事件机制拦截 click */}
+        <button
+          type="button"
           onClick={onGenerate}
           disabled={disabled || insufficient}
+          className="MuiButtonBase-root MuiButton-root MuiButton-contained MuiButton-containedPrimary MuiButton-sizeLarge MuiButton-containedSizeLarge MuiButton-colorPrimary MuiButton-root MuiButton-contained MuiButton-containedPrimary MuiButton-sizeLarge MuiButton-containedSizeLarge MuiButton-colorPrimary"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            padding: '8px 22px',
+            fontSize: '0.9375rem',
+            fontWeight: 700,
+            lineHeight: 1.75,
+            borderRadius: '8px',
+            border: 'none',
+            cursor: disabled || insufficient ? 'default' : 'pointer',
+            backgroundColor: disabled || insufficient ? 'rgba(0, 0, 0, 0.12)' : '#1976d2',
+            color: disabled || insufficient ? 'rgba(0, 0, 0, 0.26)' : '#fff',
+            boxShadow: disabled || insufficient ? 'none' : '0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12)',
+            transition: 'background-color 250ms, box-shadow 250ms, border-color 250ms',
+            textTransform: 'uppercase',
+            letterSpacing: '0.02857em',
+            minWidth: 64,
+            position: 'relative',
+            zIndex: 10,
+          }}
+          onMouseEnter={(e) => {
+            if (!disabled && !insufficient) {
+              (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#1565c0';
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0px 2px 4px -1px rgba(0,0,0,0.2), 0px 4px 5px 0px rgba(0,0,0,0.14), 0px 1px 10px 0px rgba(0,0,0,0.12)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!disabled && !insufficient) {
+              (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#1976d2';
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12)';
+            }
+          }}
         >
+          <AutoAwesomeIcon style={{ fontSize: '1.25rem' }} />
           {isGenerating ? '生成中...' : '开始生成'}
-        </Button>
+        </button>
       </Box>
 
       {insufficient && (

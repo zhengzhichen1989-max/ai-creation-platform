@@ -6,6 +6,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import * as taskService from "../services/task.service.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
+import { contentModerationMiddleware } from "../middleware/content-moderation.middleware.js";
 import { successResponse, paginatedResponse } from "../utils/helpers.js";
 import { addImageJob, addVideoJob, addTextJob } from "../queue/index.js";
 import type { ModelType, TaskStatus, GenerateParams, ReferenceImage } from "../types/index.js";
@@ -23,8 +24,8 @@ const createTaskSchema = z.object({
 });
 
 export async function tasksRoutes(app: FastifyInstance): Promise<void> {
-  /** POST /api/v1/tasks - 创建生成任务（需认证） */
-  app.post("/", { preHandler: authMiddleware }, async (request, reply) => {
+  /** POST /api/v1/tasks - 创建生成任务（需认证 + 内容审核） */
+  app.post("/", { preHandler: [authMiddleware, contentModerationMiddleware] }, async (request, reply) => {
     const body = createTaskSchema.parse(request.body);
     const userId = request.userId!;
 

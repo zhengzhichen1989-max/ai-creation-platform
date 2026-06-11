@@ -43,9 +43,14 @@ export default function ForgotPasswordPage() {
   return (
     <Container maxWidth="sm" sx={{ mt: 10 }}>
       <Box sx={{ textAlign: 'center', mb: 4 }}>
-        <AutoAwesomeIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
+        <Box
+          component="img"
+          src="/logo.png"
+          alt="智影工厂"
+          sx={{ height: 64, width: 64, objectFit: 'contain', mb: 1 }}
+        />
         <Typography variant="h4" gutterBottom>
-          AI创作聚合平台
+          智影工厂
         </Typography>
         <Typography variant="body2" color="text.secondary">
           找回密码

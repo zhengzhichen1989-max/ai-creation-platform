@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as paymentApi from '@/api/payment';
 import { useSnackbarStore } from '@/stores/snackbar.store';
@@ -45,7 +46,7 @@ export function usePollOrderStatus(orderId: string | null, enabled: boolean) {
 export function useInvalidateCreditsOnPayment() {
   const queryClient = useQueryClient();
 
-  return () => {
+  return useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['credits'] });
-  };
+  }, [queryClient]);
 }

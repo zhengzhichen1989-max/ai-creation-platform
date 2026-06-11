@@ -5,13 +5,18 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import * as authService from "../services/auth.service.js";
+import { sendSmsCode, verifySmsCode, SmsRateLimitError, SmsSendError } from "../services/sms.service.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 import { successResponse } from "../utils/helpers.js";
+import { SmsCodeError } from "../utils/errors.js";
+import { config } from "../config/index.js";
 
 const registerSchema = z.object({
   email: z.string().email("邮箱格式不正确"),
   password: z.string().min(8, "密码至少8位"),
   nickname: z.string().min(1, "昵称不能为空").max(50, "昵称最多50个字符"),
+  phone: z.string().regex(/^1[3-9]\d{9}$/, "手机号格式不正确"),
+  smsCode: z.string().length(6, "验证码为6位数字"),
 });
 
 const loginSchema = z.object({
@@ -47,11 +52,26 @@ const securityQuestionSchema = z.object({
   answer: z.string().min(1, "答案不能为空").max(200),
 });
 
+const sendSmsCodeSchema = z.object({
+  phone: z.string().regex(/^1[3-9]\d{9}$/, "手机号格式不正确"),
+});
+
+const phoneLoginSchema = z.object({
+  phone: z.string().regex(/^1[3-9]\d{9}$/, "手机号格式不正确"),
+  code: z.string().length(6, "验证码为6位数字"),
+});
+
 export async function authRoutes(app: FastifyInstance): Promise<void> {
-  /** POST /api/v1/auth/register - 用户注册 */
+  /** POST /api/v1/auth/register - 用户注册（需手机验证码实名） */
   app.post("/register", async (request, reply) => {
     const body = registerSchema.parse(request.body);
-    const result = await authService.register(body.email, body.password, body.nickname);
+
+    // 先验证短信验证码
+    if (!verifySmsCode(body.phone, body.smsCode)) {
+      throw new SmsCodeError("验证码错误或已过期");
+    }
+
+    const result = await authService.register(body.email, body.password, body.nickname, body.phone);
     reply.status(201).send(successResponse(result, "ok", 201));
   });
 
@@ -112,5 +132,35 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const userId = request.userId!;
     await authService.setSecurityQuestion(userId, body.question, body.answer);
     reply.send(successResponse({ message: "安全问题设置成功" }));
+  });
+
+  // ============================================================
+  // 手机验证码登录
+  // ============================================================
+
+  /** POST /api/v1/auth/send-sms-code - 发送短信验证码（公开） */
+  app.post("/send-sms-code", async (request, reply) => {
+    const body = sendSmsCodeSchema.parse(request.body);
+    try {
+      const code = await sendSmsCode(body.phone);
+      // 开发环境返回验证码到前端，便于测试
+      const devCode = config.isDev && code ? { devCode: code } : {};
+      reply.send(successResponse({ message: "验证码已发送", ...devCode }));
+    } catch (err) {
+      if (err instanceof SmsRateLimitError) {
+        reply.status(429).send({ code: 429, data: null, message: err.message });
+      } else if (err instanceof SmsSendError) {
+        reply.status(500).send({ code: 5000, data: null, message: err.message });
+      } else {
+        throw err;
+      }
+    }
+  });
+
+  /** POST /api/v1/auth/phone-login - 手机验证码登录（公开） */
+  app.post("/phone-login", async (request, reply) => {
+    const body = phoneLoginSchema.parse(request.body);
+    const result = await authService.phoneLogin(body.phone, body.code);
+    reply.send(successResponse(result));
   });
 }

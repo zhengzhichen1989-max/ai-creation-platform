@@ -9,9 +9,10 @@ export interface ApiResponse<T = unknown> {
 
 export interface User {
   id: number;
-  email: string;
+  email: string | null;
   nickname: string;
   avatarUrl: string | null;
+  phone?: string | null;
   role?: string;
 }
 
@@ -26,16 +27,20 @@ export interface RefreshResult {
   refreshToken: string;
 }
 
-/** Register a new user */
+/** Register a new user (requires phone SMS verification) */
 export async function register(
   email: string,
   password: string,
   nickname: string,
+  phone: string,
+  smsCode: string,
 ): Promise<AuthResult> {
   const res = await apiClient.post<ApiResponse<AuthResult>>('/auth/register', {
     email,
     password,
     nickname,
+    phone,
+    smsCode,
   });
   return res.data.data;
 }
@@ -88,4 +93,16 @@ export async function setSecurityQuestion(question: string, answer: string): Pro
 /** Change password (authenticated, requires old password) */
 export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
   await apiClient.put<ApiResponse<{ message: string }>>('/auth/change-password', { oldPassword, newPassword });
+}
+
+/** Send SMS verification code */
+export async function sendSmsCode(phone: string): Promise<{ message: string; devCode?: string }> {
+  const res = await apiClient.post<ApiResponse<{ message: string; devCode?: string }>>('/auth/send-sms-code', { phone });
+  return res.data.data;
+}
+
+/** Login with phone + SMS code */
+export async function phoneLogin(phone: string, code: string): Promise<AuthResult> {
+  const res = await apiClient.post<ApiResponse<AuthResult>>('/auth/phone-login', { phone, code });
+  return res.data.data;
 }

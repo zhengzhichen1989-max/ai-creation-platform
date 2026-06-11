@@ -23,6 +23,24 @@ export function useLogin() {
   });
 }
 
+export function usePhoneLogin() {
+  const login = useAuthStore((s) => s.login);
+  const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
+  const navigate = useNavigate();
+
+  return useMutation({
+    mutationFn: ({ phone, code }: { phone: string; code: string }) =>
+      authApi.phoneLogin(phone, code),
+    onSuccess: (data) => {
+      login(data.accessToken, data.refreshToken, data.user);
+      showSnackbar('登录成功', 'success');
+      navigate('/workspace');
+    },
+    onError: () => {
+    },
+  });
+}
+
 export function useRegister() {
   const login = useAuthStore((s) => s.login);
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);

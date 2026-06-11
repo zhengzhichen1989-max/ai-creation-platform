@@ -12,6 +12,7 @@ export interface ModelProviderConfig {
 /** 每个模型对应的 provider 和调用端点 */
 export const MODEL_PROVIDER_MAP: Record<string, ModelProviderConfig> = {
   // GrsAI 图片模型
+  'gpt-image-2-vip': { provider: 'grsai', endpoint: '/v1/draw/completions', method: 'POST' },
   'gpt-image-2': { provider: 'grsai', endpoint: '/v1/draw/completions', method: 'POST' },
   'nano-banana-pro': { provider: 'grsai', endpoint: '/v1/draw/nano-banana', method: 'POST' },
   'nano-banana-fast': { provider: 'grsai', endpoint: '/v1/draw/nano-banana', method: 'POST' },

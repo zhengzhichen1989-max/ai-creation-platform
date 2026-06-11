@@ -77,6 +77,8 @@ export async function createNativeOrder(
   const client = getWxPayClient();
   const wechatPayConfig = config.wechatPay;
 
+  console.log("[WechatPay] 发起Native下单: orderId=%s, amount=%d分, notifyUrl=%s", orderId, amountCents, notifyUrl);
+
   const result = await client.transactions_native({
     appid: wechatPayConfig.appId || undefined,
     mchid: wechatPayConfig.mchId,
@@ -88,6 +90,11 @@ export async function createNativeOrder(
       currency: "CNY",
     },
   });
+
+  console.log("[WechatPay] 下单响应: status=%d, data=%j, error=%j",
+    result.status,
+    result.data ? JSON.stringify(result.data).substring(0, 200) : "null",
+    result.error ? JSON.stringify(result.error).substring(0, 200) : "null");
 
   // transactions_native 返回 Output 对象，data 中包含 code_url
   if (result.status === 200 && result.data?.code_url) {

@@ -17,15 +17,25 @@ const createOrderSchema = z.object({
 export async function paymentRoutes(app: FastifyInstance): Promise<void> {
   /** POST /api/v1/payment/create-order - 创建支付订单（需认证） */
   app.post("/create-order", { preHandler: authMiddleware }, async (request, reply) => {
-    const body = createOrderSchema.parse(request.body);
-    const userId = request.userId!;
+    try {
+      const body = createOrderSchema.parse(request.body);
+      const userId = request.userId!;
+      console.log("[CreateOrder] 收到请求: userId=%d, packageId=%s", userId, body.packageId);
 
-    const result = await orderService.createOrder(userId, body.packageId);
+      const result = await orderService.createOrder(userId, body.packageId);
 
-    reply.send(successResponse({
-      orderId: result.orderId,
-      codeUrl: result.codeUrl,
-    }));
+      console.log("[CreateOrder] 成功: orderId=%s, codeUrl=%s", result.orderId, result.codeUrl);
+      reply.send(successResponse({
+        orderId: result.orderId,
+        codeUrl: result.codeUrl,
+      }));
+    } catch (error) {
+      console.error("[CreateOrder] 失败:", error instanceof Error ? error.message : String(error));
+      console.error("[CreateOrder] Stack:", error instanceof Error ? error.stack : "(no stack)");
+      // 返回业务错误信息给前端，而不是丢 500
+      const msg = error instanceof Error ? error.message : "创建订单失败";
+      reply.code(400).send({ code: 4000, data: null, message: msg });
+    }
   });
 
   /** POST /api/v1/payment/notify - 微信支付回调通知（公开，不需认证） */

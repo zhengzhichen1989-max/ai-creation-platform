@@ -1,6 +1,7 @@
 import { Box, Typography, Button } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import type { GenerationTask } from '@/api/tasks';
+import { getMediaUrl } from '@/utils/mediaUrl';
 
 interface VideoResultProps {
   task: GenerationTask;
@@ -17,6 +18,8 @@ export function VideoResult({ task }: VideoResultProps) {
     );
   }
 
+  const displayUrl = getMediaUrl(resultUrl) || resultUrl;
+
   return (
     <Box>
       <Box
@@ -30,7 +33,7 @@ export function VideoResult({ task }: VideoResultProps) {
         }}
       >
         <video
-          src={resultUrl}
+          src={displayUrl}
           controls
           autoPlay
           style={{ maxHeight: 480, width: '100%', objectFit: 'contain' }}
@@ -46,7 +49,7 @@ export function VideoResult({ task }: VideoResultProps) {
       <Button
         variant="outlined"
         startIcon={<DownloadIcon />}
-        href={resultUrl}
+        href={displayUrl}
         download
         size="small"
       >

@@ -135,7 +135,65 @@ export class SecurityQuestionError extends AppError {
   }
 }
 
+/** 短信验证码错误 */
+export class SmsCodeError extends AppError {
+  constructor(message: string = "验证码错误或已过期") {
+    super(message, 4014, 400);
+    this.name = "SmsCodeError";
+  }
+}
+
+/** 手机号已被注册 */
+export class PhoneExistsError extends AppError {
+  constructor(phone: string) {
+    super(`手机号已被注册: ${phone}`, 4008, 409);
+    this.name = "PhoneExistsError";
+  }
+}
+
+/** 种草视频会话不存在 */
+export class ShouzuoSessionNotFoundError extends AppError {
+  constructor(sessionId: string) {
+    super(`会话不存在: ${sessionId}`, 4001, 404);
+    this.name = "ShouzuoSessionNotFoundError";
+  }
+}
+
+/** 种草视频会话状态不允许操作 */
+export class ShouzuoSessionStateError extends AppError {
+  constructor(message: string = "当前会话状态不允许此操作") {
+    super(message, 4009, 400);
+    this.name = "ShouzuoSessionStateError";
+  }
+}
+
 /** 判断是否为自定义应用错误 */
 export function isAppError(error: unknown): error is AppError {
   return error instanceof AppError;
+}
+
+/**
+ * 将上游 API 原始错误码翻译为用户可读的中文提示
+ * 用于 GrsAI / DMXAPI 等上游返回的原始错误码（如 output_moderation）
+ */
+const ERROR_TRANSLATIONS: Record<string, string> = {
+  output_moderation: "内容不符合安全规范，请修改描述后重试",
+  input_moderation: "输入内容触发安全审核，请修改后重试",
+  content_filter: "内容被安全策略拦截，请调整描述",
+  content_policy_violation: "内容违反使用政策，请修改后重试",
+  safety_system: "系统安全审核未通过，请调整内容",
+  insufficient_credits: "上游服务额度不足，请联系客服",
+  rate_limit: "请求太频繁，请稍后重试",
+  timeout: "生成超时，请稍后重试",
+};
+
+export function translateError(raw: string): string {
+  // 精确匹配
+  if (ERROR_TRANSLATIONS[raw]) return ERROR_TRANSLATIONS[raw];
+  // 模糊匹配（raw 中可能包含错误码）
+  const lower = raw.toLowerCase();
+  for (const [key, val] of Object.entries(ERROR_TRANSLATIONS)) {
+    if (lower.includes(key)) return val;
+  }
+  return raw;
 }

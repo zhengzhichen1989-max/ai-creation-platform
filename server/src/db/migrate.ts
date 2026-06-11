@@ -160,6 +160,14 @@ export async function runMigration(): Promise<void> {
     console.log("[Migration] ai_models.provider 字段已存在，跳过迁移");
   }
 
+  // 新增 fallback_model_id 字段（NULL表示无回退模型）
+  try {
+    sqlite.run("ALTER TABLE ai_models ADD COLUMN fallback_model_id TEXT");
+    console.log("[Migration] 已为 ai_models 表添加 fallback_model_id 字段");
+  } catch {
+    console.log("[Migration] ai_models.fallback_model_id 字段已存在，跳过迁移");
+  }
+
   // ============================================================
   // 管理员用户管理模块迁移
   // ============================================================
@@ -238,17 +246,18 @@ export async function runMigration(): Promise<void> {
   // 注意：模型 id 使用 DMXAPI/GrsAI 实际的模型ID，前端显示名保持友好名称
   const models = [
     // GrsAI 图片模型
-    { id: "gpt-image-2", name: "GPT Image 2", type: "image", category: "flagship", cost_credits: 3, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 1, duration_options: null, duration_pricing: null, provider: "grsai", resolution_options: null, resolution_pricing: null },
+    { id: "gpt-image-2-vip", name: "GPT Image 2 VIP", type: "image", category: "flagship", cost_credits: 3, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 1, duration_options: null, duration_pricing: null, provider: "grsai", resolution_options: null, resolution_pricing: null, fallback_model_id: "gpt-image-2" },
+    { id: "gpt-image-2", name: "GPT Image 2", type: "image", category: "flagship", cost_credits: 3, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 99, duration_options: null, duration_pricing: null, provider: "grsai", resolution_options: null, resolution_pricing: null, fallback_model_id: null },
     { id: "nano-banana-pro", name: "Nano Banana Pro", type: "image", category: "advanced", cost_credits: 3, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 2, duration_options: null, duration_pricing: null, provider: "grsai", resolution_options: null, resolution_pricing: null },
     { id: "nano-banana-fast", name: "Nano Banana Fast", type: "image", category: "starter", cost_credits: 2, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 3, duration_options: null, duration_pricing: null, provider: "grsai", resolution_options: null, resolution_pricing: null },
     { id: "flux-pro", name: "Flux Pro", type: "image", category: "standard", cost_credits: 3, adapter_class: "GrsAIImageAdapter", enabled: 1, config: JSON.stringify({ defaultWidth: 1024, defaultHeight: 1024 }), sort_order: 4, duration_options: null, duration_pricing: null, provider: "grsai", resolution_options: null, resolution_pricing: null },
     // DMXAPI 视频模型（id使用真实模型ID，name保持前端友好显示名）
-    // duration_pricing = 720P基础价，resolution_pricing = 按时长+分辨率的嵌套附加价
-    // 图片模型定价不变，视频模型按用户确认的新定价方案
-    { id: "doubao-seedance-2-0-260128", name: "Seedance 2.0", type: "video", category: "flagship", cost_credits: 45, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 5, duration_options: "[5,10,15]", duration_pricing: '{"5":45,"10":85,"15":121}', provider: "dmxapi", resolution_options: "[\"720p\",\"1080p\"]", resolution_pricing: '{"720p":{"5":0,"10":0,"15":0},"1080p":{"5":66,"10":127,"15":180}}' },
-    { id: "doubao-seedance-2-0-fast-260128", name: "Seedance 2.0 Fast", type: "video", category: "advanced", cost_credits: 36, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 6, duration_options: "[5,10,15]", duration_pricing: '{"5":36,"10":68,"15":97}', provider: "dmxapi", resolution_options: "[\"720p\"]", resolution_pricing: '{"720p":{"5":0,"10":0,"15":0}}' },
-    { id: "sora-2", name: "Sora 2", type: "video", category: "flagship", cost_credits: 26, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 4, defaultFps: 24 }), sort_order: 7, duration_options: "[4,8,12]", duration_pricing: '{"4":26,"8":49,"12":70}', provider: "dmxapi", resolution_options: "[\"720p\"]", resolution_pricing: '{"720p":{"4":0,"8":0,"12":0}}' },
-    { id: "kling-v3-video-generation", name: "可灵 Kling 3.0", type: "video", category: "standard", cost_credits: 32, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 8, duration_options: "[5,10,15]", duration_pricing: '{"5":32,"10":61,"15":86}', provider: "dmxapi", resolution_options: "[\"720p\",\"1080p\"]", resolution_pricing: '{"720p":{"5":0,"10":0,"15":0},"1080p":{"5":11,"10":20,"15":29}}' },
+    // duration_pricing = 最低分辨率基础价，resolution_pricing = 更高分辨率的嵌套附加价
+    // 图片模型定价不变，视频模型按新定价方案
+    { id: "doubao-seedance-2-0-260128", name: "Seedance 2.0", type: "video", category: "flagship", cost_credits: 25, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 5, duration_options: "[5,10,15]", duration_pricing: '{"5":25,"10":50,"15":75}', provider: "dmxapi", resolution_options: "[\"480p\",\"720p\",\"1080p\"]", resolution_pricing: '{"480p":{"5":0,"10":0,"15":0},"720p":{"5":25,"10":50,"15":75},"1080p":{"5":100,"10":200,"15":300}}' },
+    { id: "doubao-seedance-2-0-fast-260128", name: "Seedance 2.0 Fast", type: "video", category: "advanced", cost_credits: 20, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 6, duration_options: "[5,10,15]", duration_pricing: '{"5":20,"10":40,"15":60}', provider: "dmxapi", resolution_options: "[\"480p\",\"720p\"]", resolution_pricing: '{"480p":{"5":0,"10":0,"15":0},"720p":{"5":20,"10":40,"15":60}}' },
+    { id: "sora-2", name: "Sora 2", type: "video", category: "flagship", cost_credits: 25, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 4, defaultFps: 24 }), sort_order: 7, duration_options: "[4,8,12]", duration_pricing: '{"4":25,"8":47,"12":67}', provider: "dmxapi", resolution_options: "[\"720p\"]", resolution_pricing: '{"720p":{"4":0,"8":0,"12":0}}' },
+    { id: "kling-v3-video-generation", name: "可灵 Kling 3.0", type: "video", category: "standard", cost_credits: 25, adapter_class: "DMXAPIVideoAdapter", enabled: 1, config: JSON.stringify({ defaultDuration: 5, defaultFps: 24 }), sort_order: 8, duration_options: "[5,10,15]", duration_pricing: '{"5":25,"10":50,"15":75}', provider: "dmxapi", resolution_options: "[\"720p\",\"1080p\"]", resolution_pricing: '{"720p":{"5":0,"10":0,"15":0},"1080p":{"5":5,"10":10,"15":15}}' },
     // DMXAPI 文案模型（id使用真实模型ID，name保持前端友好显示名）
     { id: "deepseek-chat", name: "DeepSeek V4", type: "text", category: "starter", cost_credits: 1, adapter_class: "DMXAPITextAdapter", enabled: 1, config: null, sort_order: 9, duration_options: null, duration_pricing: null, provider: "dmxapi", resolution_options: null, resolution_pricing: null },
     { id: "qwen-max", name: "Qwen3-Max", type: "text", category: "standard", cost_credits: 2, adapter_class: "DMXAPITextAdapter", enabled: 1, config: null, sort_order: 10, duration_options: null, duration_pricing: null, provider: "dmxapi", resolution_options: null, resolution_pricing: null },
@@ -256,21 +265,21 @@ export async function runMigration(): Promise<void> {
 
   for (const m of models) {
     sqlite.run(
-      `INSERT INTO ai_models (id, name, type, category, cost_credits, adapter_class, enabled, config, sort_order, duration_options, duration_pricing, provider, resolution_options, resolution_pricing) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO ai_models (id, name, type, category, cost_credits, adapter_class, enabled, config, sort_order, duration_options, duration_pricing, provider, resolution_options, resolution_pricing, fallback_model_id) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET 
          name=excluded.name, type=excluded.type, category=excluded.category, 
          cost_credits=excluded.cost_credits, adapter_class=excluded.adapter_class, 
          config=excluded.config, sort_order=excluded.sort_order, 
          duration_options=excluded.duration_options, duration_pricing=excluded.duration_pricing, 
          provider=excluded.provider, resolution_options=excluded.resolution_options, 
-         resolution_pricing=excluded.resolution_pricing`,
-      [m.id, m.name, m.type, m.category, m.cost_credits, m.adapter_class, m.enabled, m.config, m.sort_order, m.duration_options, m.duration_pricing, m.provider, m.resolution_options ?? null, m.resolution_pricing ?? null]
+         resolution_pricing=excluded.resolution_pricing, fallback_model_id=excluded.fallback_model_id`,
+      [m.id, m.name, m.type, m.category, m.cost_credits, m.adapter_class, m.enabled, m.config, m.sort_order, m.duration_options, m.duration_pricing, m.provider, m.resolution_options ?? null, m.resolution_pricing ?? null, m.fallback_model_id ?? null]
     );
   }
 
   sqlite.run("PRAGMA foreign_keys = ON");
-  console.log("[Migration] AI模型种子数据 UPSERT 完成（10条）");
+  console.log("[Migration] AI模型种子数据 UPSERT 完成（11条）");
 
   // 插入种子数据：积分包
   const packageCountResult = sqlite.exec("SELECT COUNT(*) as cnt FROM credit_packages");

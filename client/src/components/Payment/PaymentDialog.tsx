@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -59,8 +59,14 @@ export function PaymentDialog({
     return `¥${(cents / 100).toFixed(2)}`;
   };
 
+  // 防止重复创建订单
+  const createOrderRef = useRef(false);
+
   // 创建订单
   const handleCreateOrder = useCallback(async () => {
+    if (createOrderRef.current) return;
+    createOrderRef.current = true;
+
     setPaymentState('creating');
     setOrderId(null);
     setCodeUrl(null);
@@ -84,12 +90,14 @@ export function PaymentDialog({
       setQrSvg(svgString);
       setPaymentState('scanning');
     } catch {
-      // error 已由 useCreateOrder 的 onError 处理
       setPaymentState('failed');
+    } finally {
+      createOrderRef.current = false;
     }
-  }, [packageId, createOrderMutation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [packageId]);
 
-  // Dialog 打开时创建订单
+  // Dialog 打开时创建订单（仅依赖 open，避免无限循环）
   useEffect(() => {
     if (open) {
       handleCreateOrder();
@@ -100,7 +108,8 @@ export function PaymentDialog({
       setQrSvg('');
       setPaymentState('creating');
     }
-  }, [open, handleCreateOrder]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // 监听订单状态变化
   useEffect(() => {
@@ -120,17 +129,20 @@ export function PaymentDialog({
       setPaymentState('failed');
       showSnackbar('订单已退款', 'info');
     }
-  }, [orderStatus, invalidateCredits, showSnackbar]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderStatus, showSnackbar]);
 
   // 支付成功后自动关闭弹窗
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
     if (paymentState === 'success') {
       const timer = setTimeout(() => {
-        onClose();
+        onCloseRef.current();
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [paymentState, onClose]);
+  }, [paymentState]);
 
   return (
     <Dialog

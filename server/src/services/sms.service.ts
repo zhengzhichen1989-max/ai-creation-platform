@@ -54,7 +54,7 @@ export async function sendSmsCode(phone: string): Promise<string> {
 
   // 存入数据库（过期时间由 SQLite datetime 计算，避免 JS 时区问题）
   db.run(
-    "INSERT INTO sms_codes (phone, code, expires_at) VALUES (?, ?, datetime('now', '+5 minutes'))",
+    "INSERT INTO sms_codes (phone, code, expires_at) VALUES (?, ?, datetime('now', '+3 minutes'))",
     [phone, code]
   );
   saveDatabase();
@@ -112,7 +112,7 @@ export function verifySmsCode(phone: string, code: string): boolean {
 
   // 标记为已使用
   db.run("UPDATE sms_codes SET used = 1 WHERE id = ?", [id]);
-  saveDatabase();
+  // 不在这里 saveDatabase() —— 5秒自动保存定时器会处理，避免阻塞事件循环
 
   return true;
 }

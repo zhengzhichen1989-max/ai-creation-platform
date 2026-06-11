@@ -38,6 +38,7 @@ desktop.ini
 *.pid
 *.seed
 pids/
+nul
 
 # Coverage
 coverage/

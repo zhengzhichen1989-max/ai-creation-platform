@@ -12,6 +12,7 @@ import {
   Divider,
 } from '@mui/material';
 import CreateIcon from '@mui/icons-material/Create';
+import VideocamIcon from '@mui/icons-material/Videocam';
 import HistoryIcon from '@mui/icons-material/History';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import PersonIcon from '@mui/icons-material/Person';
@@ -25,6 +26,7 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { label: '工作台', path: '/workspace', icon: <CreateIcon /> },
+  { label: '种草视频', path: '/shouzuo-video', icon: <VideocamIcon /> },
   { label: '历史记录', path: '/history', icon: <HistoryIcon /> },
   { label: '积分充值', path: '/credits', icon: <AccountBalanceWalletIcon /> },
   { label: '个人中心', path: '/profile', icon: <PersonIcon /> },
@@ -54,10 +56,20 @@ export default function Sidebar({ width }: SidebarProps) {
       }}
     >
       <Toolbar sx={{ px: 2, gap: 1 }}>
-        <AutoAwesomeIcon sx={{ color: 'primary.main', fontSize: 28 }} />
-        <Typography variant="h6" noWrap sx={{ fontWeight: 700, color: 'primary.main' }}>
-          AI创作平台
-        </Typography>
+        <Box
+          component="img"
+          src="/logo.png"
+          alt="智影工厂"
+          sx={{ height: 32, width: 32, objectFit: 'contain', borderRadius: 1 }}
+        />
+        <Box>
+          <Typography variant="subtitle1" noWrap sx={{ fontWeight: 700, color: 'primary.main', lineHeight: 1.2 }}>
+            智影工厂
+          </Typography>
+          <Typography variant="caption" noWrap sx={{ color: 'text.secondary', lineHeight: 1 }}>
+            ZhiyingWorks
+          </Typography>
+        </Box>
       </Toolbar>
 
       <Divider />
@@ -116,7 +128,7 @@ export default function Sidebar({ width }: SidebarProps) {
 
       <Box sx={{ p: 2, textAlign: 'center' }}>
         <Typography variant="caption" color="text.secondary">
-          v1.0.0 MVP
+          v2.0.0
         </Typography>
       </Box>
     </Drawer>

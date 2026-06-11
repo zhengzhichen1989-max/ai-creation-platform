@@ -15,7 +15,6 @@ import {
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { resetPassword } from '@/api/auth';
 
 export default function ResetPasswordPage() {
@@ -57,9 +56,14 @@ export default function ResetPasswordPage() {
   return (
     <Container maxWidth="sm" sx={{ mt: 10 }}>
       <Box sx={{ textAlign: 'center', mb: 4 }}>
-        <AutoAwesomeIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
+        <Box
+          component="img"
+          src="/logo.png"
+          alt="智影工厂"
+          sx={{ height: 64, width: 64, objectFit: 'contain', mb: 1 }}
+        />
         <Typography variant="h4" gutterBottom>
-          AI创作聚合平台
+          智影工厂
         </Typography>
         <Typography variant="body2" color="text.secondary">
           重置密码

@@ -12,6 +12,9 @@ import { nowISO } from "../utils/helpers.js";
 import * as adminUserService from "../services/admin-user.service.js";
 import * as adminOperationLogService from "../services/admin-operation-log.service.js";
 import * as creditsService from "../services/credits.service.js";
+import { reloadRules } from "../services/content-moderation.service.js";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+import { resolve } from "path";
 
 // ---- Zod 校验 Schema ----
 
@@ -451,5 +454,127 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const query = operationLogQuerySchema.parse(request.query);
     const result = adminOperationLogService.listLogs(query.page, query.pageSize, query.action, query.adminId);
     reply.send(paginatedResponse(result.items, result.total, result.page, result.pageSize));
+  });
+
+  // ============================================================
+  // 敏感词管理 /api/v1/admin/moderation
+  // ============================================================
+
+  const MODERATION_RULES_PATH = resolve(process.cwd(), "server/config/moderation-rules.json");
+
+  function readRulesFile() {
+    const raw = readFileSync(MODERATION_RULES_PATH, "utf-8");
+    return JSON.parse(raw);
+  }
+
+  function writeRulesFile(data: any) {
+    writeFileSync(MODERATION_RULES_PATH, JSON.stringify(data, null, 2) + "\n", "utf-8");
+  }
+
+  /** GET /moderation/rules — 获取所有敏感词规则 */
+  app.get("/moderation/rules", async (_request, reply) => {
+    try {
+      if (!existsSync(MODERATION_RULES_PATH)) {
+        reply.send(successResponse([], "规则文件不存在"));
+        return;
+      }
+      const data = readRulesFile();
+      const rules = (data as any).rules || [];
+      reply.send(successResponse(rules));
+    } catch (err: any) {
+      reply.status(500).send({ code: 5000, data: null, message: `读取规则失败: ${err.message}` });
+    }
+  });
+
+  /** POST /moderation/rules — 添加一条敏感词规则 */
+  app.post("/moderation/rules", async (request, reply) => {
+    try {
+      const { category, pattern, reason } = request.body as any;
+      if (!category || !pattern || !reason) {
+        reply.status(400).send({ code: 4000, data: null, message: "category、pattern、reason 均为必填" });
+        return;
+      }
+
+      const data = readRulesFile();
+      if (!Array.isArray(data.rules)) data.rules = [];
+
+      // 检查是否已存在同分类同 pattern
+      const exists = data.rules.some(
+        (r: any) => r.category === category && r.pattern === pattern
+      );
+      if (exists) {
+        reply.status(409).send({ code: 4090, data: null, message: "该规则已存在" });
+        return;
+      }
+
+      data.rules.push({ category, pattern, reason });
+      writeRulesFile(data);
+
+      // 热重载规则到内存
+      reloadRules();
+
+      reply.status(201).send(successResponse({ category, pattern, reason }, "添加成功", 201));
+    } catch (err: any) {
+      reply.status(500).send({ code: 5000, data: null, message: `添加规则失败: ${err.message}` });
+    }
+  });
+
+  /** PUT /moderation/rules/:index — 更新一条规则（index 从 0 开始） */
+  app.put("/moderation/rules/:index", async (request, reply) => {
+    try {
+      const { index } = request.params as any;
+      const idx = parseInt(index, 10);
+      const { category, pattern, reason } = request.body as any;
+
+      const data = readRulesFile();
+      if (!Array.isArray(data.rules) || idx < 0 || idx >= data.rules.length) {
+        reply.status(404).send({ code: 4001, data: null, message: `规则不存在: index=${index}` });
+        return;
+      }
+
+      if (category) data.rules[idx].category = category;
+      if (pattern) data.rules[idx].pattern = pattern;
+      if (reason) data.rules[idx].reason = reason;
+      writeRulesFile(data);
+
+      reloadRules();
+
+      reply.send(successResponse(data.rules[idx], "更新成功"));
+    } catch (err: any) {
+      reply.status(500).send({ code: 5000, data: null, message: `更新规则失败: ${err.message}` });
+    }
+  });
+
+  /** DELETE /moderation/rules/:index — 删除一条规则（index 从 0 开始） */
+  app.delete("/moderation/rules/:index", async (request, reply) => {
+    try {
+      const { index } = request.params as any;
+      const idx = parseInt(index, 10);
+
+      const data = readRulesFile();
+      if (!Array.isArray(data.rules) || idx < 0 || idx >= data.rules.length) {
+        reply.status(404).send({ code: 4001, data: null, message: `规则不存在: index=${index}` });
+        return;
+      }
+
+      const removed = data.rules.splice(idx, 1);
+      writeRulesFile(data);
+
+      reloadRules();
+
+      reply.send(successResponse(removed[0], "已删除"));
+    } catch (err: any) {
+      reply.status(500).send({ code: 5000, data: null, message: `删除规则失败: ${err.message}` });
+    }
+  });
+
+  /** POST /moderation/reload — 热重载规则（修改 JSON 后无需重启） */
+  app.post("/moderation/reload", async (_request, reply) => {
+    try {
+      reloadRules();
+      reply.send(successResponse(null, "规则已热重载"));
+    } catch (err: any) {
+      reply.status(500).send({ code: 5000, data: null, message: `重载失败: ${err.message}` });
+    }
   });
 }

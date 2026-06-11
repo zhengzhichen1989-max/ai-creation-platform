@@ -9,16 +9,16 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 加载 .env 文件 — 使用 process.cwd() 确保从 server/ 目录查找
-dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+// 加载 .env 文件 — 基于当前文件位置解析，不受 PM2 cwd 影响
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 /** 应用配置 */
 export const config = {
   /** 服务端口 */
   port: parseInt(process.env.PORT || "3000", 10),
 
-  /** 运行环境 */
-  nodeEnv: process.env.NODE_ENV || "development",
+  /** 运行环境 — 默认 production，必须显式设 NODE_ENV=development 才进入开发模式 */
+  nodeEnv: process.env.NODE_ENV || "production",
 
   /** 数据库路径 — 使用 process.cwd() 解析相对路径 */
   databaseUrl: process.env.DATABASE_URL || path.resolve(process.cwd(), "data/ai-creation.db"),
@@ -77,6 +77,18 @@ export const config = {
     pass: process.env.EMAIL_PASS || "",           // 授权码/密码
     fromName: process.env.EMAIL_FROM_NAME || "织影智作",
   },
+
+  /** 阿里云短信服务 */
+  sms: {
+    accessKeyId: process.env.ALIBABA_ACCESS_KEY_ID || "",
+    accessKeySecret: process.env.ALIBABA_ACCESS_KEY_SECRET || "",
+    signName: process.env.ALIBABA_SMS_SIGN_NAME || "智影工厂",
+    templateCode: process.env.ALIBABA_SMS_TEMPLATE_CODE || "",
+  },
+
+  /** 内容审核规则文件路径 */
+  contentModerationRulesPath: process.env.CONTENT_MODERATION_RULES_PATH
+    || path.resolve(process.cwd(), "server/config/moderation-rules.json"),
 
   /** 是否为开发环境 */
   get isDev(): boolean {

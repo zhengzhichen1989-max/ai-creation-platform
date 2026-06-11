@@ -105,7 +105,7 @@ export class GrsAIImageAdapter {
 
     // 构建 multipart/form-data 请求体
     const formData = new FormData();
-    formData.append("model", "gpt-image-2");
+    formData.append("model", this.modelId);
     formData.append("prompt", prompt);
     formData.append("size", size);
 
@@ -113,7 +113,7 @@ export class GrsAIImageAdapter {
     const imageBlob = await this.getImageBlob(imageUrl);
     formData.append("image", imageBlob, "image.jpg");
 
-    console.log(`[GrsAIImageAdapter] 发起图生图编辑(multipart): model=gpt-image-2`);
+    console.log(`[GrsAIImageAdapter] 发起图生图编辑(multipart): model=${this.modelId}`);
 
     const response = await fetch(url, {
       method: "POST",

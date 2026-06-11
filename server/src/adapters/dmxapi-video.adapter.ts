@@ -32,12 +32,27 @@ export class DMXAPIVideoAdapter {
     return { width: 1280, height: 720 };
   }
 
-  /** 将本地路径（如 /uploads/ref_images/xxx.jpg）转为完整URL */
+  /** 将本地路径转为可外部访问的URL；若服务器是localhost则自动转为base64 data URI */
   private toFullUrl(localPath: string): string {
     if (localPath.startsWith("http://") || localPath.startsWith("https://")) {
       return localPath;
     }
-    return `${config.publicBaseUrl}${localPath}`;
+    const fullUrl = `${config.publicBaseUrl}${localPath}`;
+    // 若 publicBaseUrl 是 localhost/127.0.0.1 等内网地址，外部API无法访问，转为 base64
+    if (config.publicBaseUrl.includes("localhost") || config.publicBaseUrl.includes("127.0.0.1")) {
+      try {
+        const filePath = path.join(config.uploadDir, localPath.replace(/^\/uploads\//, ""));
+        if (fs.existsSync(filePath)) {
+          const buffer = fs.readFileSync(filePath);
+          const ext = path.extname(filePath).toLowerCase();
+          const mime = ext === ".png" ? "image/png" : ext === ".gif" ? "image/gif" : "image/jpeg";
+          return `data:${mime};base64,${buffer.toString("base64")}`;
+        }
+      } catch (err) {
+        console.error(`[DMXAPIVideoAdapter] 读取本地参考图失败: ${localPath}`, err);
+      }
+    }
+    return fullUrl;
   }
 
   /** 从提交响应中提取 taskId，兼容两种返回格式 */
