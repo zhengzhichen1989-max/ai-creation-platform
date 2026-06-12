@@ -39,10 +39,14 @@ import CopywritingResultView from '@/components/ShouzuoVideo/CopywritingResultVi
 export default function ShouzuoVideoPage() {
   const navigate = useNavigate();
   const [productDescription, setProductDescription] = useState('');
-  const [storyboardFrameCount, setStoryboardFrameCount] = useState(4);
+  const [storyboardFrameCount, setStoryboardFrameCount] = useState(3);
+  const [videoResolution, setVideoResolution] = useState('9:16');
+  const [videoResolutionQuality, setVideoResolutionQuality] = useState<'720p' | '1080p'>('720p');
   const [videoDuration, setVideoDuration] = useState(10);
   const [uploading, setUploading] = useState(false);
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
+  const [firstFrameIndex, setFirstFrameIndex] = useState(0);
+  const [lastFrameIndex, setLastFrameIndex] = useState(0);
 
   const [productName, setProductName] = useState('');
   const [productDesc, setProductDesc] = useState('');
@@ -82,13 +86,24 @@ export default function ShouzuoVideoPage() {
     stopPolling,
   } = useShouzuoVideo();
 
-  const { uploadedUrls, setUploadedFiles, reset } = useShouzuoVideoStore();
+  const { uploadedUrls, setUploadedFiles, reset, setFirstFrameIndex: storeSetFirstFrameIndex, setLastFrameIndex: storeSetLastFrameIndex } = useShouzuoVideoStore();
 
   useEffect(() => {
     if (uploadedFiles.length > 0 && !showProductForm) {
       setShowProductForm(true);
     }
   }, [uploadedFiles.length]);
+
+  // 故事板变化时，重置首尾帧默认值
+  useEffect(() => {
+    if (storyboard?.frames.length) {
+      const lastIndex = storyboard.frames.length - 1;
+      setFirstFrameIndex(0);
+      setLastFrameIndex(lastIndex);
+      storeSetFirstFrameIndex(0);
+      storeSetLastFrameIndex(lastIndex);
+    }
+  }, [storyboard]);
 
   useEffect(() => {
     return () => {
@@ -187,8 +202,8 @@ export default function ShouzuoVideoPage() {
   }, [uploadedFiles, startAnalysis, buildProductInfo]);
 
   const handleConfirmStoryboard = useCallback(() => {
-    confirmStoryboardAndGenerateVideo(videoDuration);
-  }, [confirmStoryboardAndGenerateVideo, videoDuration]);
+    confirmStoryboardAndGenerateVideo(videoDuration, videoResolution, firstFrameIndex, lastFrameIndex, videoResolutionQuality);
+  }, [confirmStoryboardAndGenerateVideo, videoDuration, videoResolution, firstFrameIndex, lastFrameIndex]);
 
   const handleGenerateCopywriting = useCallback(() => {
     generateCopywriting(productDescription);
@@ -218,6 +233,34 @@ export default function ShouzuoVideoPage() {
       URL.revokeObjectURL(url);
     }
   }, [getSelectedCopywriting, getSelectedVideoUrl]);
+
+  /** 视频生成完成后直接下载视频（fetch+blob方案，支持跨域） */
+  const handleDownloadVideo = useCallback(async () => {
+    const videoUrl = getSelectedVideoUrl();
+    if (!videoUrl) return;
+
+    try {
+      const response = await fetch(videoUrl);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'shouzuo_video.mp4';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.warn('[Shouzuo Video] blob下载失败，尝试直接下载:', err);
+      // 降级：直接href下载
+      const a = document.createElement('a');
+      a.href = videoUrl!;
+      a.download = 'shouzuo_video.mp4';
+      a.target = '_blank';
+      a.click();
+    }
+  }, [getSelectedVideoUrl]);
 
   const renderProductInfoForm = () => {
     const doGenerate = () => {
@@ -484,14 +527,14 @@ export default function ShouzuoVideoPage() {
                   <Slider
                     value={storyboardFrameCount}
                     onChange={(_, v) => setStoryboardFrameCount(v as number)}
-                    min={4}
-                    max={8}
+                    min={1}
+                    max={4}
                     step={1}
                     marks={[
+                      { value: 1, label: '1' },
+                      { value: 2, label: '2' },
+                      { value: 3, label: '3' },
                       { value: 4, label: '4' },
-                      { value: 5, label: '5' },
-                      { value: 6, label: '6' },
-                      { value: 8, label: '8' },
                     ]}
                     valueLabelDisplay="auto"
                     sx={{ flex: 1 }}
@@ -517,6 +560,10 @@ export default function ShouzuoVideoPage() {
               onRegenerateFrame={(frameIndex, feedback) => {
                 regenerateSingleFrame(frameIndex, feedback);
               }}
+              firstFrameIndex={firstFrameIndex}
+              lastFrameIndex={lastFrameIndex}
+              onFirstFrameChange={(index) => { setFirstFrameIndex(index); storeSetFirstFrameIndex(index); }}
+              onLastFrameChange={(index) => { setLastFrameIndex(index); storeSetLastFrameIndex(index); }}
             />
           </Box>
         );
@@ -596,6 +643,83 @@ export default function ShouzuoVideoPage() {
               </Box>
             </Paper>
 
+            <Paper variant="outlined" sx={{ p: 2.5, mb: 2 }}>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 0.5 }}>
+                📐 视频比例
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                选择适合发布平台的视频比例
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {[
+                  { label: '9:16 竖屏', value: '9:16', desc: '小红书/抖音', icon: '📱' },
+                  { label: '16:9 横屏', value: '16:9', desc: 'B站/横屏', icon: '🖥️' },
+                  { label: '1:1 方形', value: '1:1', desc: 'Ins/朋友圈', icon: '⬜' },
+                  { label: '3:4 竖屏', value: '3:4', desc: '小红书封面', icon: '📷' },
+                ].map((opt) => (
+                  <Paper
+                    key={opt.value}
+                    variant="outlined"
+                    onClick={() => setVideoResolution(opt.value)}
+                    sx={{
+                      p: 1.5,
+                      cursor: 'pointer',
+                      borderColor: videoResolution === opt.value ? 'primary.main' : 'divider',
+                      borderWidth: videoResolution === opt.value ? 2 : 1,
+                      bgcolor: videoResolution === opt.value ? 'primary.50' : 'background.paper',
+                      transition: 'all 0.2s',
+                      '&:hover': { borderColor: 'primary.light', bgcolor: 'action.hover' },
+                      minWidth: 120,
+                      textAlign: 'center',
+                    }}
+                  >
+                    <Typography fontSize="1.3rem">{opt.icon}</Typography>
+                    <Typography variant="body2" fontWeight={600}>{opt.label}</Typography>
+                    <Typography variant="caption" color="text.secondary">{opt.desc}</Typography>
+                  </Paper>
+                ))}
+              </Box>
+            </Paper>
+
+            <Paper variant="outlined" sx={{ p: 2.5, mb: 2 }}>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 0.5 }}>
+                🎞️ 视频清晰度
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                1080P画质更清晰，消耗积分更多
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                {[
+                  { label: '720P 标清', value: '720p', desc: '性价比高', icon: '📺', disabled: false },
+                  { label: '1080P 高清', value: '1080p', desc: '画质细腻', icon: '🎬', disabled: videoModel === 'seedance-2-0-fast' },
+                ].map((opt) => (
+                  <Paper
+                    key={opt.value}
+                    variant="outlined"
+                    onClick={() => !opt.disabled && setVideoResolutionQuality(opt.value as '720p' | '1080p')}
+                    sx={{
+                      p: 1.5,
+                      cursor: opt.disabled ? 'not-allowed' : 'pointer',
+                      opacity: opt.disabled ? 0.5 : 1,
+                      borderColor: !opt.disabled && videoResolutionQuality === opt.value ? 'primary.main' : 'divider',
+                      borderWidth: !opt.disabled && videoResolutionQuality === opt.value ? 2 : 1,
+                      bgcolor: !opt.disabled && videoResolutionQuality === opt.value ? 'primary.50' : 'background.paper',
+                      transition: 'all 0.2s',
+                      '&:hover': !opt.disabled ? { borderColor: 'primary.light', bgcolor: 'action.hover' } : {},
+                      minWidth: 140,
+                      textAlign: 'center',
+                    }}
+                  >
+                    <Typography fontSize="1.3rem">{opt.icon}</Typography>
+                    <Typography variant="body2" fontWeight={600}>{opt.label}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {opt.disabled ? 'Fast版不支持' : opt.desc}
+                    </Typography>
+                  </Paper>
+                ))}
+              </Box>
+            </Paper>
+
             {storyboard && (
               <StoryboardView
                 storyboard={storyboard}
@@ -609,6 +733,10 @@ export default function ShouzuoVideoPage() {
                 onRegenerateFrame={(frameIndex, feedback) => {
                   regenerateSingleFrame(frameIndex, feedback);
                 }}
+                firstFrameIndex={firstFrameIndex}
+                lastFrameIndex={lastFrameIndex}
+                onFirstFrameChange={(index) => { setFirstFrameIndex(index); storeSetFirstFrameIndex(index); }}
+                onLastFrameChange={(index) => { setLastFrameIndex(index); storeSetLastFrameIndex(index); }}
               />
             )}
           </Box>
@@ -620,6 +748,7 @@ export default function ShouzuoVideoPage() {
             result={videoResult}
             isGenerating={isVideoGenerating}
             isPolling={isVideoPolling}
+            onDownload={handleDownloadVideo}
           />
         );
 

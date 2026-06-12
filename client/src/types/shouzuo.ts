@@ -24,7 +24,8 @@ export const SHOUZUO_STEPS: { key: ShouzuoStep; label: string; number: number }[
 /** 视频生成模型 */
 export const VIDEO_MODELS = [
   { id: 'kling-v3', name: 'Kling 3.0', description: '可灵3.0 — 画面细腻，动作自然，支持1080p/720p，适合高品质带货视频', icon: '🎬' },
-  { id: 'seedance-2-0', name: 'Seedance 2.0', description: '即梦2.0 — 生成快速，风格多样，支持720p，适合快速出片和测试', icon: '💃' },
+  { id: 'seedance-2-0', name: 'Seedance 2.0', description: '即梦2.0 标准版 — 质量更好，支持720p', icon: '🎨' },
+  { id: 'seedance-2-0-fast', name: 'Seedance 2.0 快速', description: '即梦2.0 快速版 — 生成更快，适合快速出片和测试', icon: '⚡' },
 ] as const;
 
 export type VideoModelId = typeof VIDEO_MODELS[number]['id'];
@@ -51,7 +52,7 @@ export interface ImageAnalysis {
 
 /** 故事板分镜帧 */
 export interface StoryboardFrame {
-  index: number;         // 帧序号 1-8
+  index: number;         // 帧序号 1-4（新方案）
   description: string;   // 分镜描述（中文）
   imageUrl: string;      // 生成的帧图片URL
   prompt: string;        // 生成该帧的prompt
@@ -145,8 +146,12 @@ export interface GenerateVideoParams {
   sessionId: string;
   storyboardFrames: StoryboardFrame[];
   styleName: string;
-  modelId: string;       // kling-v3 | seedance-2-0
+  modelId: string;       // kling-v3 | seedance-2-0 | seedance-2-0-fast
   duration?: number;     // 5-15秒
+  resolution?: string;    // 视频比例："9:16" | "16:9" | "1:1" | "3:4" | "4:3" | "2:1" | "1:2"
+  resolutionQuality?: string;  // 分辨率品质："720p" | "1080p"
+  firstFrameIndex?: number; // 用户选择的首帧索引（默认0）
+  lastFrameIndex?: number;  // 用户选择的尾帧索引（默认最后一帧）
 }
 
 export interface GenerateCopywritingParams {

@@ -92,6 +92,7 @@ const generateVideoSchema = z.object({
   modelId: z.enum(["kling-v3", "seedance-2-0", "seedance-2-0-fast"]).default("kling-v3"),
   duration: z.number().int().min(5).max(15).optional(),
   resolution: z.string().optional(), // 如 "9:16"、"16:9"、"1:1"
+  resolutionQuality: z.enum(["720p", "1080p"]).default("720p"), // 分辨率品质选择
   firstFrameIndex: z.number().int().optional(),  // 用户选择的首帧索引（默认0）
   lastFrameIndex: z.number().int().optional(),   // 用户选择的尾帧索引（默认最后一帧）
 });
@@ -989,18 +990,33 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
       );
 
       // 解析分辨率 → 宽高（视频模型需要具体像素值）
-      let width = 720, height = 1280; // 默认 9:16 竖屏
-      if (body.resolution === "16:9" || body.resolution === "2:1") {
-        width = 1280; height = 720;
-      } else if (body.resolution === "1:1") {
-        width = 1024; height = 1024;
-      } else if (body.resolution === "4:3") {
-        width = 960; height = 720;
-      } else if (body.resolution === "3:4" || body.resolution === "1:2") {
-        width = 720; height = 960;
+      // 根据用户选择的 resolutionQuality (720p/1080p) 决定像素大小
+      const quality = body.resolutionQuality ?? "720p";
+      const is1080p = quality === "1080p";
+
+      // Seedance Fast 不支持 1080p，降级到 720p
+      if (is1080p && body.modelId === "seedance-2-0-fast") {
+        console.log("[Shouzuo Video] Seedance Fast 不支持 1080p，降级为 720p");
       }
-      // 1080p 仅当分辨率足够大时启用
-      const resolutionStr = (width >= 1920 || height >= 1920) ? "1080p" : "720p";
+      const effective1080p = is1080p && body.modelId !== "seedance-2-0-fast";
+
+      let width, height;
+      if (body.resolution === "16:9" || body.resolution === "2:1") {
+        width = effective1080p ? 1920 : 1280; height = effective1080p ? 1080 : 720;
+      } else if (body.resolution === "9:16" || body.resolution === "1:2") {
+        width = effective1080p ? 1080 : 720; height = effective1080p ? 1920 : 1280;
+      } else if (body.resolution === "1:1") {
+        width = effective1080p ? 1080 : 1024; height = effective1080p ? 1080 : 1024;
+      } else if (body.resolution === "4:3") {
+        width = effective1080p ? 1440 : 960; height = effective1080p ? 1080 : 720;
+      } else if (body.resolution === "3:4") {
+        width = effective1080p ? 1080 : 720; height = effective1080p ? 1440 : 960;
+      } else {
+        // 默认 9:16
+        width = effective1080p ? 1080 : 720; height = effective1080p ? 1920 : 1280;
+      }
+
+      const resolutionStr = effective1080p ? "1080p" : "720p";
 
       const refRoles = referenceImages.map(r => r.role).join(",");
       console.log(`[Shouzuo Video] model=${body.modelId}, prompt=${prompt.substring(0, 120)}..., frames=${body.storyboardFrames.length}, refs=[${refRoles}]`);

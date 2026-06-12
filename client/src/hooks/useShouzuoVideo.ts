@@ -176,7 +176,7 @@ export function useShouzuoVideo() {
   }, [session, selectedStyle, setError, setRegeneratingFrame, finishStoryboardRegenerate]);
 
   /** Step 5→6: 确认故事板，开始生成视频 */
-  const confirmStoryboardAndGenerateVideo = useCallback(async (duration?: number) => {
+  const confirmStoryboardAndGenerateVideo = useCallback(async (duration?: number, resolution?: string, firstFrameIndex?: number, lastFrameIndex?: number, resolutionQuality?: string) => {
     try {
       setError(null);
       setStep('generate');
@@ -189,6 +189,10 @@ export function useShouzuoVideo() {
         styleName: selectedStyle?.name ?? '',
         modelId: videoModel,
         duration,
+        resolution,
+        resolutionQuality,
+        firstFrameIndex,
+        lastFrameIndex,
       });
 
       setVideoResult(result);
