@@ -720,6 +720,29 @@ export default function ShouzuoVideoPage() {
               </Box>
             </Paper>
 
+            {/* 首尾帧选择引导提示 */}
+            {storyboard && (
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  mb: 2,
+                  bgcolor: videoModel?.startsWith('kling') ? 'warning.50' : 'info.50',
+                  borderColor: videoModel?.startsWith('kling') ? 'warning.main' : 'info.main',
+                  borderWidth: 1.5,
+                }}
+              >
+                <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>
+                  🎯 为视频选择首帧和尾帧
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {videoModel?.startsWith('kling')
+                    ? 'Kling V3 仅使用首帧+尾帧作为参考画面生成视频，中间帧由 AI 根据画面描述自动补全。请点击下方帧图片左上角的「首帧」「尾帧」按钮进行选择。'
+                    : 'Seedance 2.0 会将所有帧作为参考画面传入，首帧决定起始镜头，尾帧决定结束镜头。请点击下方帧图片左上角的「首帧」「尾帧」按钮进行选择。'}
+                </Typography>
+              </Paper>
+            )}
+
             {storyboard && (
               <StoryboardView
                 storyboard={storyboard}
