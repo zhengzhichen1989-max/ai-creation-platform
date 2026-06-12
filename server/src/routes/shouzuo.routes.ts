@@ -830,6 +830,40 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
    *  核心策略：用 GPT-4o Vision 分析中间帧的实际画面内容，
    *  让视频模型理解需要依次展现哪些场景，而非简单淡入淡出。
    */
+  /**
+   * 电影级摄影指令 — 根据风格返回专业影视摄影参数
+   * 每个风格有独立的镜头语言、光线设计、色彩调性、运动节奏
+   */
+  function getCinematicDirection(styleName: string): string {
+    const profiles: Record<string, string> = {
+      "森系": "35mm定焦镜头，f/1.8浅景深，柔焦背景虚化。清晨柔和的侧逆光穿过树叶间隙，形成自然光斑。画面调色偏向富士Velvia胶片质感，翠绿与暖金交织，色彩饱和度适中偏暖，高光略带暖黄，阴影保留丰富细节。",
+      "日系": "50mm标准镜头，f/2.8中等景深。大面积柔光窗光，正面补光均匀柔和。画面调色偏向日系清透蓝白调，降低对比度+3%高光提亮，肤色自然通透，白色高光略带冷青。整体干净明亮、空气感十足。",
+      "复古": "85mm人像镜头，f/2.0柔焦，微眩光。钨丝灯暖调主光+琥珀色补光，暗角约15%。调色模仿Kodak Portra 400胶片：暖黄基底，阴影偏棕褐，高光微橙，加入轻微胶片颗粒和柔焦光晕。",
+      "极简": "24mm广角或标准镜头，f/5.6大景深全清晰。大面积柔光箱顶光，无阴影硬光。调色偏向低饱和莫兰迪色系，对比度降低10%，整体偏冷灰白调，画面干净利落、留白充分。",
+      "氛围感": "58mm f/1.4超大光圈，极致浅景深。烛光/暖调氛围灯点光源，暗调low-key布光，光比1:8。调色偏向电影感青橙色调（teal & orange LUT），暗部深蓝黑，高光暖橙，营造私密高级的氛围。",
+    };
+    return profiles[styleName] ?? "35mm标准镜头，f/2.8中等景深。柔光自然光线，正面补光均匀。专业产品摄影质感，色彩真实自然，高光柔和阴影细节丰富。";
+  }
+
+  /**
+   * 摄像机运动指令 — 根据帧数生成不同的运镜方案
+   */
+  function getCameraMovement(frameCount: number, resolution?: string): string {
+    const isVertical = !resolution || resolution === "9:16" || resolution === "3:4" || resolution === "1:2";
+    const base = isVertical
+      ? "缓慢的dolly in推进镜头，从产品中景平滑过渡到细节特写。"
+      : "缓慢的水平滑轨dolly，从左至右展示产品全貌。";
+
+    if (frameCount === 1) {
+      return base + "画面带微妙的呼吸感浮动（subtle floating motion），模拟手持摄影的轻柔晃动，增强真实感和亲密感。";
+    }
+    if (frameCount === 2) {
+      return base + "镜头运动采用ease-in-out缓入缓出曲线，画面衔接处有0.5秒的柔和叠化转场（soft cross-dissolve）。";
+    }
+    return base + "每幕画面之间使用柔和的叠化转场（cross-dissolve 0.8秒），镜头运动始终保持缓慢匀速，如丝般顺滑的steadicam质感。";
+  }
+
+  /** 构建电影级视频生成 prompt */
   async function buildVideoPromptWithFrames(
     styleName: string,
     frames: Array<{ index: number; description: string; prompt: string; imageUrl: string }>,
@@ -842,7 +876,7 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
     const firstFrame = sorted[firstFrameIndex ?? 0];
     const lastFrame = sorted[lastFrameIndex !== undefined ? lastFrameIndex : (sorted.length - 1)];
 
-    // 分辨率提示
+    // 分辨率标签
     let ratioLabel = "9:16竖屏";
     if (resolution === "16:9" || resolution === "2:1") ratioLabel = "16:9横屏";
     else if (resolution === "1:1") ratioLabel = "1:1方形";
@@ -850,37 +884,34 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
     else if (resolution === "1:2") ratioLabel = "1:2竖屏";
 
     const isSeedance = modelId?.startsWith("seedance");
+    const isKling = modelId?.startsWith("kling");
+    const cinematic = getCinematicDirection(styleName);
+    const camera = getCameraMovement(sorted.length, resolution);
 
+    // ===== Seedance 2.0：全帧参考图 + 精炼 prompt（上限480字）=====
     if (isSeedance) {
-      // Seedance 2.0：全帧作为参考图传入，不依赖 GPT-4o 描述
       const referenceImages: Array<{ url: string; role: "first_frame" | "last_frame" | "reference_image" }> = [
         { url: firstFrame.imageUrl, role: "first_frame" as const },
       ];
       if (sorted.length > 1) {
         referenceImages.push({ url: lastFrame.imageUrl, role: "last_frame" as const });
       }
-      // 中间帧作为 reference_image
       for (let i = 1; i < sorted.length - 1; i++) {
         referenceImages.push({ url: sorted[i].imageUrl, role: "reference_image" });
       }
 
-      // 构建 prompt（使用"图片N"引用，不调用 GPT-4o）
-      if (sorted.length === 1) {
-        const prompt = `${ratioLabel}，${styleName}风格种草短视频。图片1是产品的展示画面。缓慢运镜展示产品细节，柔光自然光线，专业产品摄影质感，适合社交媒体传播。`;
-        return { prompt: prompt.substring(0, 800), referenceImages };
-      }
+      const frameRef = sorted.length === 1
+        ? "图片1是产品画面。"
+        : sorted.length === 2
+          ? "从图片1的首帧画面平滑过渡到图片2的尾帧画面。"
+          : `图片1是首帧→图片${sorted.length}是尾帧，中间帧为过渡画面。`;
 
-      if (sorted.length === 2) {
-        const prompt = `${ratioLabel}，${styleName}风格种草短视频。从图片1的首帧画面，平滑过渡到图片2的尾帧画面。镜头推进展示产品全貌与细节，柔光自然光线，专业产品摄影质感，适合社交媒体传播。`;
-        return { prompt: prompt.substring(0, 800), referenceImages };
-      }
-
-      // 3+帧
-      const prompt = `${ratioLabel}种草短视频，${styleName}风格。图片1是首帧画面。图片2..${sorted.length - 1}是中间过渡画面。图片${sorted.length}是尾帧画面。镜头依次推进，每幕之间平滑转场，柔光自然光线，专业产品摄影质感，适合社交媒体传播。`;
-      return { prompt: prompt.substring(0, 800), referenceImages };
+      const prompt = `产品种草短视频，${ratioLabel}，${styleName}风格。${frameRef}${camera}${cinematic}`;
+      console.log(`[Shouzuo Prompt] Seedance ${sorted.length}帧, prompt=${prompt.length}字`);
+      return { prompt: prompt.substring(0, 480), referenceImages };
     }
 
-    // Kling 分支：首尾帧作为参考图，中间帧通过 GPT-4o 描述
+    // ===== Kling V3：首尾帧参考图 + GPT-4o 分析 + 长篇 prompt（上限2000字）=====
     const referenceImages: Array<{ url: string; role: "first_frame" | "last_frame" }> = [
       { url: firstFrame.imageUrl, role: "first_frame" as const },
     ];
@@ -888,23 +919,22 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
       referenceImages.push({ url: lastFrame.imageUrl, role: "last_frame" as const });
     }
 
-    // 构造电影化叙事 prompt — 明确描述每个镜头的内容和过渡
     if (sorted.length === 1) {
-      // 单帧：静态展示
-      const prompt = `${ratioLabel}，${styleName}风格种草短视频。${firstFrame.description || firstFrame.prompt}。缓慢运镜展示产品细节，柔光自然光线，专业产品摄影质感，适合社交媒体传播。`;
-      return { prompt: prompt.substring(0, 800), referenceImages };
+      const prompt = `${styleName}风格产品种草短视频，${ratioLabel}。\n${camera}\n画面内容：${firstFrame.description || firstFrame.prompt}\n${cinematic}`;
+      return { prompt: prompt.substring(0, 2000), referenceImages };
     }
 
     if (sorted.length === 2) {
-      // 双帧：从首帧过渡到尾帧
-      const prompt = `${ratioLabel}，${styleName}风格种草短视频。从${firstFrame.description || firstFrame.prompt}，平滑过渡到${lastFrame.description || lastFrame.prompt}。镜头推进展示产品全貌与细节，柔光自然光线，专业产品摄影质感，适合社交媒体传播。`;
-      return { prompt: prompt.substring(0, 800), referenceImages };
+      const prompt = `${styleName}风格产品种草短视频，${ratioLabel}。\n` +
+        `${camera}\n` +
+        `首帧画面：${firstFrame.description || firstFrame.prompt}\n` +
+        `尾帧画面：${lastFrame.description || lastFrame.prompt}\n` +
+        `从首帧到尾帧平滑过渡，镜头自然推进。${cinematic}`;
+      return { prompt: prompt.substring(0, 2000), referenceImages };
     }
 
-    // 3-4帧：GPT-4o Vision 分析中间帧实际画面 + 构造 prompt
+    // 3-4帧：GPT-4o Vision 分析中间帧
     const middleFrames = sorted.slice(1, sorted.length - 1);
-
-    // 调用 GPT-4o 描述中间帧图片的真实画面内容
     let middleDescription = "";
     try {
       middleDescription = await describeMiddleFrames(
@@ -912,34 +942,32 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
       );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[Shouzuo Prompt] GPT-4o 描述中间帧失败，回退使用生图prompt: ${msg}`);
-      // 回退：用每帧的 prompt 文本拼凑
+      console.warn(`[Shouzuo Prompt] GPT-4o 描述中间帧失败，回退: ${msg}`);
       middleDescription = middleFrames
         .map((f, i) => {
           const clean = (f.prompt || f.description)
-            .replace(/--\w+[\s\d.]*/g, "")
-            .replace(/\b(width|height|size|ratio)\b/gi, "")
-            .trim()
-            .substring(0, 60);
-          return `中间幕${i + 1}：${clean}`;
+            .replace(/--\w+[\s\d.]*/g, "").replace(/\b(width|height|size|ratio)\b/gi, "").trim().substring(0, 80);
+          return `第${i + 2}幕：${clean}`;
         })
-        .join("；");
+        .join("；\n");
     }
 
-    // 首尾帧简短描述（清理技术参数）
     const cleanFirst = (firstFrame.prompt || firstFrame.description)
-      .replace(/--\w+[\s\d.]*/g, "").trim().substring(0, 60);
+      .replace(/--\w+[\s\d.]*/g, "").trim().substring(0, 80);
     const cleanLast = (lastFrame.prompt || lastFrame.description)
-      .replace(/--\w+[\s\d.]*/g, "").trim().substring(0, 60);
+      .replace(/--\w+[\s\d.]*/g, "").trim().substring(0, 80);
 
-    const prompt = `${ratioLabel}种草短视频，${styleName}风格。\n` +
-      `首帧：${cleanFirst}。\n` +
-      `中间过渡（AI视觉分析）：${middleDescription}\n` +
-      `尾帧：${cleanLast}。\n` +
-      `镜头依次推进，每幕之间平滑转场，柔光自然光线，专业产品摄影质感，适合社交媒体传播。`;
+    const prompt = `${styleName}风格产品种草短视频，${ratioLabel}。\n\n` +
+      `【镜头运动】${camera}\n\n` +
+      `【画面叙事】\n` +
+      `第1幕（首帧）：${cleanFirst}\n` +
+      `中间过渡：${middleDescription}\n` +
+      `第${sorted.length}幕（尾帧）：${cleanLast}\n\n` +
+      `【摄影指导】${cinematic}\n\n` +
+      `重要：画面之间使用柔和叠化转场，镜头缓慢匀速推进，营造高级质感。`;
 
-    console.log(`[Shouzuo Prompt] ${sorted.length}帧 → GPT-4o描述=${middleDescription.length}字, prompt总长=${prompt.length}字`);
-    return { prompt: prompt.substring(0, 1200), referenceImages };
+    console.log(`[Shouzuo Prompt] Kling ${sorted.length}帧, GPT-4o=${middleDescription.length}字, prompt总长=${prompt.length}字`);
+    return { prompt: prompt.substring(0, 2000), referenceImages };
   }
 
   /** POST /api/v1/shouzuo/video/generate — 生成种草视频（DMXAPI Seedance 2.0 / Kling 3.0） */
