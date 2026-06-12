@@ -4,6 +4,7 @@
 
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 import { contentModerationMiddleware } from "../middleware/content-moderation.middleware.js";
 import { successResponse, paginatedResponse } from "../utils/helpers.js";
@@ -67,7 +68,7 @@ const generateStoryboardSchema = z.object({
   sessionId: z.string().min(1),
   styleId: z.string().min(1),
   styleName: z.string().min(1),
-  frameCount: z.number().int().min(4).max(8),
+  frameCount: z.number().int().min(1).max(4),
   productDescription: z.string().optional(),
 });
 
@@ -75,7 +76,7 @@ const regenerateStoryboardSchema = z.object({
   sessionId: z.string().min(1),
   styleId: z.string().min(1),
   styleName: z.string().min(1),
-  frameCount: z.number().int().min(4).max(8),
+  frameCount: z.number().int().min(1).max(4),
   feedback: z.string().optional(),
 });
 
@@ -88,8 +89,11 @@ const generateVideoSchema = z.object({
     prompt: z.string(),
   })),
   styleName: z.string().min(1),
-  modelId: z.enum(["kling-v3", "seedance-2-0"]).default("kling-v3"),
+  modelId: z.enum(["kling-v3", "seedance-2-0", "seedance-2-0-fast"]).default("kling-v3"),
   duration: z.number().int().min(5).max(15).optional(),
+  resolution: z.string().optional(), // 如 "9:16"、"16:9"、"1:1"
+  firstFrameIndex: z.number().int().optional(),  // 用户选择的首帧索引（默认0）
+  lastFrameIndex: z.number().int().optional(),   // 用户选择的尾帧索引（默认最后一帧）
 });
 
 const generateCopywritingSchema = z.object({
@@ -530,6 +534,26 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
     // 保存到数据库
     shouzuoService.saveStoryboard(body.sessionId, userId, frames, body.styleName);
 
+    // 需求3：故事板帧生成完成后，为每帧写入 generation_tasks 历史记录
+    try {
+      const db = getDb();
+      for (const frame of frames) {
+        db.prepare(
+          `INSERT INTO generation_tasks (id, user_id, model_id, type, prompt, params, status, cost_credits, result_url, result_thumbnail, progress, started_at, completed_at)
+           VALUES (?, ?, 'gpt-image-2', 'storyboard_frame', ?, ?, 'completed', 0, ?, NULL, 100, datetime('now'), datetime('now'))`
+        ).run(
+          randomUUID(),
+          userId,
+          frame.prompt,
+          JSON.stringify({ sessionId: body.sessionId, frameIndex: frame.index }),
+          frame.imageUrl,
+        );
+      }
+      console.log(`[Storyboard] 已写入 ${frames.length} 条 generation_tasks 帧历史记录`);
+    } catch (err) {
+      console.warn(`[Storyboard] 写入帧 generation_tasks 失败（不影响主流程）:`, err);
+    }
+
     const failedCount = frames.filter((f) => f.imageUrl === productImageUrl).length;
     console.log(`[Storyboard] 完成: ${frames.length}帧, ${failedCount}帧失败/回退`);
 
@@ -755,16 +779,166 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
   // modelId 映射表：前端用户选择的模型ID → DMXAPI 内部模型ID
   const VIDEO_MODEL_MAP: Record<string, string> = {
     "kling-v3": "kling-v3-video-generation",
-    "seedance-2-0": "doubao-seedance-2-0-fast-260128",
+    "seedance-2-0": "doubao-seedance-2-0-260128",
+    "seedance-2-0-fast": "doubao-seedance-2-0-fast-260128",
   };
 
-  /** 从分镜帧构造视频生成 prompt */
-  function buildVideoPrompt(styleName: string, frames: Array<{ index: number; description: string; prompt: string }>): string {
+  /** 调用 GPT-4o Vision 分析中间帧图片的实际画面内容
+   *  与直接用生图 prompt 文本不同，GPT-4o 会"看"真实生成的图片，
+   *  提取关键视觉元素，确保视频 prompt 描述的是实际画面而非期望画面。
+   */
+  async function describeMiddleFrames(
+    frameImages: Array<{ imageUrl: string; index: number }>,
+  ): Promise<string> {
+    const { DMXAPITextAdapter } = await import("../adapters/dmxapi-text.adapter.js");
+    const { config: cfg } = await import("../config/index.js");
+    const fsMod = await import("fs");
+    const pathMod = await import("path");
+
+    const adapter = new DMXAPITextAdapter("gpt-4o");
+
+    // 将图片 URL 转为完整公网地址
+    const fullUrls = frameImages.map((f) =>
+      f.imageUrl.startsWith("http") ? f.imageUrl : `${cfg.publicBaseUrl}${f.imageUrl}`
+    );
+
+    const visionPrompt = `请依次描述以下${frameImages.length}张图片的画面内容。对每张图片用一句中文描述：画面主体是什么、在什么场景中、光线和色调如何、整体氛围是什么。只描述你看到的内容，不要分析和评价。`;
+
+    console.log(`[GPT-4o MiddleFrames] 分析 ${frameImages.length} 张中间帧...`);
+    const result = await adapter.generate(visionPrompt, {
+      referenceImages: fullUrls.map((url) => ({ url, role: "reference_image" })),
+    });
+
+    if (result.status === "completed" && result.resultUrl) {
+      // resultUrl 格式: /uploads/text_xxx.txt → 转为文件系统路径
+      const textPath = result.resultUrl.startsWith("/")
+        ? pathMod.join(cfg.uploadDir, pathMod.basename(result.resultUrl))
+        : result.resultUrl;
+
+      if (fsMod.existsSync(textPath)) {
+        const description = fsMod.readFileSync(textPath, "utf-8").trim();
+        console.log(`[GPT-4o MiddleFrames] 完成 (${description.length}字): ${description.substring(0, 150)}...`);
+        return description;
+      }
+    }
+
+    throw new Error("GPT-4o 未返回有效文本");
+  }
+
+  /** 从分镜帧构造视频生成 prompt（含首尾帧和中帧描述）
+   *  核心策略：用 GPT-4o Vision 分析中间帧的实际画面内容，
+   *  让视频模型理解需要依次展现哪些场景，而非简单淡入淡出。
+   */
+  async function buildVideoPromptWithFrames(
+    styleName: string,
+    frames: Array<{ index: number; description: string; prompt: string; imageUrl: string }>,
+    resolution?: string,
+    firstFrameIndex?: number,
+    lastFrameIndex?: number,
+    modelId?: string,
+  ): Promise<{ prompt: string; referenceImages: Array<{ url: string; role: "first_frame" | "last_frame" | "reference_image" }> }> {
     const sorted = [...frames].sort((a, b) => a.index - b.index);
-    const sceneDescriptions = sorted.map((f, i) => `镜头${i + 1}：${f.description || f.prompt}`).join(" ");
-    const prompt = `${styleName}风格种草视频，${sceneDescriptions}。柔光自然光线，专业产品摄影质感，平滑镜头过渡，突出产品细节和材质，适合社交媒体传播。`;
-    // 截断到合理长度（视频模型通常限制 prompt 长度）
-    return prompt.length > 800 ? prompt.substring(0, 800) : prompt;
+    const firstFrame = sorted[firstFrameIndex ?? 0];
+    const lastFrame = sorted[lastFrameIndex !== undefined ? lastFrameIndex : (sorted.length - 1)];
+
+    // 分辨率提示
+    let ratioLabel = "9:16竖屏";
+    if (resolution === "16:9" || resolution === "2:1") ratioLabel = "16:9横屏";
+    else if (resolution === "1:1") ratioLabel = "1:1方形";
+    else if (resolution === "3:4") ratioLabel = "3:4竖屏";
+    else if (resolution === "1:2") ratioLabel = "1:2竖屏";
+
+    const isSeedance = modelId?.startsWith("seedance");
+
+    if (isSeedance) {
+      // Seedance 2.0：全帧作为参考图传入，不依赖 GPT-4o 描述
+      const referenceImages: Array<{ url: string; role: "first_frame" | "last_frame" | "reference_image" }> = [
+        { url: firstFrame.imageUrl, role: "first_frame" as const },
+      ];
+      if (sorted.length > 1) {
+        referenceImages.push({ url: lastFrame.imageUrl, role: "last_frame" as const });
+      }
+      // 中间帧作为 reference_image
+      for (let i = 1; i < sorted.length - 1; i++) {
+        referenceImages.push({ url: sorted[i].imageUrl, role: "reference_image" });
+      }
+
+      // 构建 prompt（使用"图片N"引用，不调用 GPT-4o）
+      if (sorted.length === 1) {
+        const prompt = `${ratioLabel}，${styleName}风格种草短视频。图片1是产品的展示画面。缓慢运镜展示产品细节，柔光自然光线，专业产品摄影质感，适合社交媒体传播。`;
+        return { prompt: prompt.substring(0, 800), referenceImages };
+      }
+
+      if (sorted.length === 2) {
+        const prompt = `${ratioLabel}，${styleName}风格种草短视频。从图片1的首帧画面，平滑过渡到图片2的尾帧画面。镜头推进展示产品全貌与细节，柔光自然光线，专业产品摄影质感，适合社交媒体传播。`;
+        return { prompt: prompt.substring(0, 800), referenceImages };
+      }
+
+      // 3+帧
+      const prompt = `${ratioLabel}种草短视频，${styleName}风格。图片1是首帧画面。图片2..${sorted.length - 1}是中间过渡画面。图片${sorted.length}是尾帧画面。镜头依次推进，每幕之间平滑转场，柔光自然光线，专业产品摄影质感，适合社交媒体传播。`;
+      return { prompt: prompt.substring(0, 800), referenceImages };
+    }
+
+    // Kling 分支：首尾帧作为参考图，中间帧通过 GPT-4o 描述
+    const referenceImages: Array<{ url: string; role: "first_frame" | "last_frame" }> = [
+      { url: firstFrame.imageUrl, role: "first_frame" as const },
+    ];
+    if (sorted.length > 1) {
+      referenceImages.push({ url: lastFrame.imageUrl, role: "last_frame" as const });
+    }
+
+    // 构造电影化叙事 prompt — 明确描述每个镜头的内容和过渡
+    if (sorted.length === 1) {
+      // 单帧：静态展示
+      const prompt = `${ratioLabel}，${styleName}风格种草短视频。${firstFrame.description || firstFrame.prompt}。缓慢运镜展示产品细节，柔光自然光线，专业产品摄影质感，适合社交媒体传播。`;
+      return { prompt: prompt.substring(0, 800), referenceImages };
+    }
+
+    if (sorted.length === 2) {
+      // 双帧：从首帧过渡到尾帧
+      const prompt = `${ratioLabel}，${styleName}风格种草短视频。从${firstFrame.description || firstFrame.prompt}，平滑过渡到${lastFrame.description || lastFrame.prompt}。镜头推进展示产品全貌与细节，柔光自然光线，专业产品摄影质感，适合社交媒体传播。`;
+      return { prompt: prompt.substring(0, 800), referenceImages };
+    }
+
+    // 3-4帧：GPT-4o Vision 分析中间帧实际画面 + 构造 prompt
+    const middleFrames = sorted.slice(1, sorted.length - 1);
+
+    // 调用 GPT-4o 描述中间帧图片的真实画面内容
+    let middleDescription = "";
+    try {
+      middleDescription = await describeMiddleFrames(
+        middleFrames.map((f) => ({ imageUrl: f.imageUrl, index: f.index }))
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[Shouzuo Prompt] GPT-4o 描述中间帧失败，回退使用生图prompt: ${msg}`);
+      // 回退：用每帧的 prompt 文本拼凑
+      middleDescription = middleFrames
+        .map((f, i) => {
+          const clean = (f.prompt || f.description)
+            .replace(/--\w+[\s\d.]*/g, "")
+            .replace(/\b(width|height|size|ratio)\b/gi, "")
+            .trim()
+            .substring(0, 60);
+          return `中间幕${i + 1}：${clean}`;
+        })
+        .join("；");
+    }
+
+    // 首尾帧简短描述（清理技术参数）
+    const cleanFirst = (firstFrame.prompt || firstFrame.description)
+      .replace(/--\w+[\s\d.]*/g, "").trim().substring(0, 60);
+    const cleanLast = (lastFrame.prompt || lastFrame.description)
+      .replace(/--\w+[\s\d.]*/g, "").trim().substring(0, 60);
+
+    const prompt = `${ratioLabel}种草短视频，${styleName}风格。\n` +
+      `首帧：${cleanFirst}。\n` +
+      `中间过渡（AI视觉分析）：${middleDescription}\n` +
+      `尾帧：${cleanLast}。\n` +
+      `镜头依次推进，每幕之间平滑转场，柔光自然光线，专业产品摄影质感，适合社交媒体传播。`;
+
+    console.log(`[Shouzuo Prompt] ${sorted.length}帧 → GPT-4o描述=${middleDescription.length}字, prompt总长=${prompt.length}字`);
+    return { prompt: prompt.substring(0, 1200), referenceImages };
   }
 
   /** POST /api/v1/shouzuo/video/generate — 生成种草视频（DMXAPI Seedance 2.0 / Kling 3.0） */
@@ -804,29 +978,39 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
       const { DMXAPIVideoAdapter } = await import("../adapters/dmxapi-video.adapter.js");
       const adapter = new DMXAPIVideoAdapter(dmxModelId);
 
-      // 构造视频 prompt
-      const prompt = buildVideoPrompt(body.styleName, body.storyboardFrames);
-
-      // 将所有分镜帧合成一张宫格图作为视频视觉参考
-      console.log(`[Shouzuo Video] 合成宫格图 (${body.storyboardFrames.length} 帧)...`);
-      const gridLocalPath = await createGridImage(
-        body.storyboardFrames.map((f) => ({ imageUrl: f.imageUrl, index: f.index })),
-        body.sessionId,
+      // 构造视频 prompt + 首尾帧参考图（新方案：不再使用宫格图）
+      const { prompt, referenceImages } = await buildVideoPromptWithFrames(
+        body.styleName,
+        body.storyboardFrames,
+        body.resolution,
+        body.firstFrameIndex,
+        body.lastFrameIndex,
+        body.modelId,
       );
-      const gridPublicUrl = toPublicUrl(gridLocalPath);
-      console.log(`[Shouzuo Video] 宫格图公网URL: ${gridPublicUrl}`);
 
-      // 用宫格图作为首帧参考
-      const referenceImages = [{ url: gridPublicUrl, role: "first_frame" as const }];
+      // 解析分辨率 → 宽高（视频模型需要具体像素值）
+      let width = 720, height = 1280; // 默认 9:16 竖屏
+      if (body.resolution === "16:9" || body.resolution === "2:1") {
+        width = 1280; height = 720;
+      } else if (body.resolution === "1:1") {
+        width = 1024; height = 1024;
+      } else if (body.resolution === "4:3") {
+        width = 960; height = 720;
+      } else if (body.resolution === "3:4" || body.resolution === "1:2") {
+        width = 720; height = 960;
+      }
+      // 1080p 仅当分辨率足够大时启用
+      const resolutionStr = (width >= 1920 || height >= 1920) ? "1080p" : "720p";
 
-      console.log(`[Shouzuo Video] prompt=${prompt.substring(0, 120)}..., gridImage=${gridLocalPath}`);
+      const refRoles = referenceImages.map(r => r.role).join(",");
+      console.log(`[Shouzuo Video] model=${body.modelId}, prompt=${prompt.substring(0, 120)}..., frames=${body.storyboardFrames.length}, refs=[${refRoles}]`);
 
       // 调用真实 API 提交任务
       const result = await adapter.generate(prompt, {
         duration,
-        resolution: "720p",
-        width: 720,
-        height: 1280,  // 竖屏 9:16
+        resolution: resolutionStr,
+        width,
+        height,
         referenceImages,
       });
 
@@ -920,6 +1104,33 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
           statusResult.resultUrl, // thumbnail 暂时用 videoUrl
           session.video_duration ?? 10,
         );
+
+        // 需求3：视频完成后，写入 generation_tasks 历史记录
+        try {
+          const db = getDb();
+          // 从 session 的 storyboard 中提取 prompt 描述
+          let videoPrompt = `种草视频`;
+          if (session.storyboard_json) {
+            try {
+              const sb = JSON.parse(session.storyboard_json);
+              videoPrompt = `种草视频: ${sb.style || ""}风格 | ${sb.frames?.length || 0}帧分镜`;
+            } catch { /* ignore */ }
+          }
+            db.prepare(
+              `INSERT INTO generation_tasks (id, user_id, model_id, type, prompt, params, status, cost_credits, result_url, result_thumbnail, progress, started_at, completed_at)
+               VALUES (?, ?, 'kling-v3-video-generation', 'shouzuo_video', ?, ?, 'completed', 0, ?, ?, 100, datetime('now'), datetime('now'))`
+            ).run(
+              randomUUID(),
+              userId,
+              videoPrompt,
+              JSON.stringify({ sessionId: id }),
+              statusResult.resultUrl,
+              statusResult.resultUrl,
+            );
+            console.log(`[Shouzuo Video] 已写入 generation_tasks 历史记录 (userId=${userId})`);
+          } catch (err) {
+            console.warn(`[Shouzuo Video] 写入 generation_tasks 失败（不影响主流程）:`, err);
+          }
       } else if (statusResult.status === "failed") {
         shouzuoService.saveVideoResult(
           id, userId, taskId, "failed",
