@@ -1,69 +1,134 @@
-/** 种草视频工作流步骤 */
+/** 种草视频工作流步骤（6步新版） */
 export type ShouzuoStep =
-  | 'upload'        // Step 1: 上传产品图
-  | 'analyze'       // Step 2: 图片理解 + 风格推荐
-  | 'select_style'  // Step 3: 用户选择风格模板
-  | 'storyboard'    // Step 4: 生成故事板 (GPT-Image-2)
-  | 'confirm_board' // Step 5: 用户确认故事板
-  | 'generate'      // Step 6: 生成种草视频
-  | 'copywriting'   // Step 7: AI文案生成
-  | 'download';     // Step 8: 用户挑选 + 一键下载
+  | 'upload'         // Step 1: 上传产品图
+  | 'ai_recognize'   // Step 2: AI 识别产品图 + 风格推荐
+  | 'video_params'    // Step 3: 确认视频参数
+  | 'storyboard'      // Step 4: 生成故事板
+  | 'video'           // Step 5: 生成视频
+  | 'copywriting';    // Step 6: AI 文案生成 + 导出
 
 /** 工作流步骤定义（带标签和序号） */
 export const SHOUZUO_STEPS: { key: ShouzuoStep; label: string; number: number }[] = [
   { key: 'upload', label: '上传产品图', number: 1 },
-  { key: 'analyze', label: '风格推荐', number: 2 },
-  { key: 'select_style', label: '选择风格', number: 3 },
+  { key: 'ai_recognize', label: 'AI识别', number: 2 },
+  { key: 'video_params', label: '视频参数', number: 3 },
   { key: 'storyboard', label: '故事板', number: 4 },
-  { key: 'confirm_board', label: '确认分镜', number: 5 },
-  { key: 'generate', label: '生成视频', number: 6 },
-  { key: 'copywriting', label: 'AI文案', number: 7 },
-  { key: 'download', label: '下载', number: 8 },
+  { key: 'video', label: '生成视频', number: 5 },
+  { key: 'copywriting', label: 'AI文案', number: 6 },
 ];
 
-/** 视频生成模型 */
+// ============================================================
+// 风格模板（5款新风格）
+// ============================================================
+
+/** 风格模板 */
+export interface StyleTemplate {
+  style_id: string;
+  name: string;
+  emoji: string;
+  tagline: string;
+  description: string;
+  applicable_clothing_types: string[];
+  applicable_materials: string[];
+  applicable_seasons: string[];
+  applicable_colors: string[];
+  recommended_model: string;
+  fallback_model: string;
+  default_resolution: string;
+  default_storyboard_count: number;
+  cost_hint: string;
+}
+
+/** 风格推荐结果 */
+export interface StyleRecommendation {
+  style_id: string;
+  confidence: number; // 0-1
+  reason: string;
+}
+
+// ============================================================
+// AI 识别结果
+// ============================================================
+
+/** 服装信息 */
+export interface ClothingInfo {
+  clothing_type: string;
+  material: string;
+  season: string[];
+  main_color: string;
+  style_tags: string[];
+  edited?: boolean; // 用户是否编辑过
+}
+
+/** AI 识别结果 */
+export interface AiRecognitionResult {
+  clothing_type: string;
+  material: string;
+  season: string[];
+  main_color: string;
+  style_tags: string[];
+  recommendations: StyleRecommendation[];
+  raw_json?: string;
+  analyzedByAI?: boolean;
+  aiError?: string;
+}
+
+// ============================================================
+// 视频参数
+// ============================================================
+
+/** 视频模型 */
 export const VIDEO_MODELS = [
-  { id: 'kling-v3', name: 'Kling 3.0', description: '可灵3.0 — 画面细腻，动作自然，支持1080p/720p，适合高品质带货视频', icon: '🎬' },
-  { id: 'seedance-2-0', name: 'Seedance 2.0', description: '即梦2.0 标准版 — 质量更好，支持720p', icon: '🎨' },
-  { id: 'seedance-2-0-fast', name: 'Seedance 2.0 快速', description: '即梦2.0 快速版 — 生成更快，适合快速出片和测试', icon: '⚡' },
+  { id: 'seedance-2.0', name: 'Seedance 2.0', description: '即梦2.0 — 单段模式，质量更好，支持1080p', icon: '🎬' },
+  { id: 'kling-v3', name: 'Kling 3.0', description: '可灵3.0 — 多段拼接，画面细腻，支持1080p', icon: '🎨' },
 ] as const;
 
 export type VideoModelId = typeof VIDEO_MODELS[number]['id'];
 
-/** 风格模板 */
-export interface StyleTemplate {
-  id: string;
-  name: string;         // 森系 / 日系 / 复古 / 极简 / 氛围感
-  description: string;
-  promptPrefix: string; // 注入到prompt的样式描述
+/** 视频参数 */
+export interface VideoParams {
+  model: VideoModelId;
+  duration: number;       // 5-15秒
+  resolution: '720p' | '1080p';
+  storyboard_count: number; // 1-6
+  kling_duration_splits?: number[]; // 仅 Kling 模式
 }
 
-/** 图片分析结果 */
-export interface ImageAnalysis {
-  category: string;       // 品类（服装/饰品/家居/食品...）
-  colors: string[];       // 主色调
-  materials: string[];    // 材质
-  style: string;          // 识别到的风格
-  styleReason?: string;   // AI 推荐该风格的理由
-  recommendedStyles: StyleTemplate[]; // 全部 5 个风格模板
-  analyzedByAI?: boolean; // 是否由 AI 真实分析
-  aiError?: string;       // AI 分析失败时的错误信息（不阻断流程）
-}
+// ============================================================
+// 故事板
+// ============================================================
 
 /** 故事板分镜帧 */
 export interface StoryboardFrame {
-  index: number;         // 帧序号 1-4（新方案）
-  description: string;   // 分镜描述（中文）
-  imageUrl: string;      // 生成的帧图片URL
-  prompt: string;        // 生成该帧的prompt
+  seq: number;           // 序号 1-6
+  name: string;           // 帧名称
+  prompt: string;         // 英文提示词（传入模型）
+  prompt_cn: string;     // 中文说明（仅展示）
+  imageUrl?: string;     // 生成的帧图片URL
+  status: 'pending' | 'generating' | 'completed' | 'failed';
+  retry_count: number;
 }
 
 /** 故事板 */
 export interface Storyboard {
-  frames: StoryboardFrame[];   // 4-8个分镜帧
+  frames: StoryboardFrame[];
   totalFrames: number;
-  style: string;               // 使用的风格
-  generatedAt: string;         // 生成时间
+  style_id: string;
+  generatedAt: string;
+}
+
+// ============================================================
+// 视频生成
+// ============================================================
+
+/** 视频段（Kling 多段模式） */
+export interface VideoSegment {
+  seq: number;
+  task_id: string;
+  video_url?: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  duration: number;
+  error?: string;
 }
 
 /** 种草视频生成结果 */
@@ -72,91 +137,102 @@ export interface ShouzuoVideoResult {
   videoUrl: string | null;
   thumbnailUrl: string | null;
   status: 'pending' | 'processing' | 'completed' | 'failed';
-  duration: number;     // 视频时长(秒)
-  progress: number;     // 0-100
+  duration: number;
+  progress: number;
   errorMessage?: string;
+  /** Kling 多段拼接：总段数和已完成数 */
+  segmentCount?: number;
+  segmentCompleted?: number;
 }
 
-/** AI文案 */
+// ============================================================
+// 文案
+// ============================================================
+
+/** AI 文案结果 */
+export interface CopywritingResult {
+  title: string;
+  content: string;
+  tags: string[];
+}
+
+/** 文案项（前端展示用） */
 export interface CopywritingItem {
   index: number;
-  title: string;        // 标题
-  body: string;         // 正文
-  hashtags: string[];   // 话题标签
+  title: string;
+  body: string;
+  hashtags: string[];
   platform: 'xiaohongshu' | 'douyin' | 'instagram';
-  selected: boolean;    // 用户是否选中
+  selected: boolean;
 }
+
+// ============================================================
+// 会话状态
+// ============================================================
 
 /** 种草视频会话状态 */
 export interface ShouzuoSession {
   sessionId: string;
   currentStep: ShouzuoStep;
-  uploadedImages: string[];     // 上传的产品图URL列表
+  uploadedImages: string[];
+  aiRecognition?: AiRecognitionResult;
   selectedStyle?: StyleTemplate;
+  videoParams?: VideoParams;
   storyboard?: Storyboard;
   videoResult?: ShouzuoVideoResult;
   copywritingItems: CopywritingItem[];
+  preDeductedCredits: number;
   createdAt: string;
 }
 
-/** 产品信息（用于故事板生成和视频生成） */
+// ============================================================
+// API 请求参数
+// ============================================================
+
+/** 产品信息 */
 export interface ProductInfo {
-  name: string;            // 产品名称
-  description: string;     // 产品描述/基本介绍
-  sellingPoints: string[]; // 核心卖点（最多5条）
-  price?: string;          // 价格（可选）
-  targetAudience?: string; // 目标人群（可选）
-}
-
-/** AI生成的产品描述结果 */
-export interface ProductDescriptionResult {
-  productName: string;
-  productDescription: string;
+  name: string;
+  description: string;
   sellingPoints: string[];
+  price?: string;
+  targetAudience?: string;
 }
 
-/** API请求参数 */
+/** 开始会话参数 */
 export interface StartSessionParams {
-  images: string[];     // 上传的图片URL列表
-  productInfo?: ProductInfo; // 产品信息（可选）
+  images: string[];
+  productInfo?: ProductInfo;
 }
 
-export interface SelectStyleParams {
+/** 确认视频参数参数 */
+export interface ConfirmVideoParams {
   sessionId: string;
-  styleId: string;
+  videoParams: VideoParams;
 }
 
+/** 生成故事板参数 */
 export interface GenerateStoryboardParams {
   sessionId: string;
-  styleId: string;
-  styleName: string;
-  frameCount: number;   // 4-8
-  productDescription?: string; // 用户补充的产品描述
+  storyboardCount: number;
+  userEditedClothing?: ClothingInfo;
 }
 
-export interface RegenerateStoryboardParams {
-  sessionId: string;
-  styleId: string;
-  styleName: string;
-  frameCount: number;
-  feedback?: string;    // 用户对上一版故事板的反馈
-}
-
+/** 生成视频参数 */
 export interface GenerateVideoParams {
   sessionId: string;
-  storyboardFrames: StoryboardFrame[];
-  styleName: string;
-  modelId: string;       // kling-v3 | seedance-2-0 | seedance-2-0-fast
-  duration?: number;     // 5-15秒
-  resolution?: string;    // 视频比例："9:16" | "16:9" | "1:1" | "3:4" | "4:3" | "2:1" | "1:2"
-  resolutionQuality?: string;  // 分辨率品质："720p" | "1080p"
-  firstFrameIndex?: number; // 用户选择的首帧索引（默认0）
-  lastFrameIndex?: number;  // 用户选择的尾帧索引（默认最后一帧）
+  model: VideoModelId;
+  resolution: '720p' | '1080p';
+  storyboardFrames: {
+    seq: number;
+    name: string;
+    prompt: string;
+    imageUrl: string;
+  }[];
+  kling_duration_splits?: number[];
 }
 
+/** 生成文案参数 */
 export interface GenerateCopywritingParams {
   sessionId: string;
-  videoUrl: string;
-  styleName: string;
-  productDescription?: string;
+  userEditedClothing?: ClothingInfo;
 }

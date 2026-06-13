@@ -74,7 +74,7 @@ export function ModelCard({ model, selected, onClick }: ModelCardProps) {
         )}
         {isVideo && model.resolutionOptions && (
           <Typography variant="caption" color="text.secondary" display="block">
-            可选分辨率：{model.resolutionOptions.map(r => r === '1080p' ? '1080P' : '720P').join(' / ')}
+            可选分辨率：{model.resolutionOptions.map(r => r.replace('p', 'P')).join(' / ')}
           </Typography>
         )}
       </CardContent>

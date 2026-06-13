@@ -93,12 +93,17 @@ export class DMXAPIVideoAdapter {
     const resSize = this.getResolutionSize(resolution);
     const width = params?.width ?? resSize.width;
     const height = params?.height ?? resSize.height;
-    let ratio = "16:9";
-    if (height > width) {
-      ratio = "9:16";
-    } else if (width === height) {
-      ratio = "1:1";
-    }
+    // 精确匹配比例字符串
+    let ratio: string;
+    const w = width, h = height;
+    if (Math.abs(w / h - 16 / 9) < 0.1) ratio = "16:9";
+    else if (Math.abs(w / h - 9 / 16) < 0.1) ratio = "9:16";
+    else if (Math.abs(w / h - 1) < 0.1) ratio = "1:1";
+    else if (Math.abs(w / h - 4 / 3) < 0.1) ratio = "4:3";
+    else if (Math.abs(w / h - 3 / 4) < 0.1) ratio = "3:4";
+    else if (Math.abs(w / h - 2) < 0.1) ratio = "2:1";
+    else if (Math.abs(w / h - 0.5) < 0.1) ratio = "1:2";
+    else ratio = w > h ? "16:9" : "9:16";
 
     // 构建 input 数组，先添加文本项
     const input: Array<Record<string, unknown>> = [{ type: "text", text: prompt }];
@@ -115,7 +120,7 @@ export class DMXAPIVideoAdapter {
       }
     }
 
-    return {
+    const seedanceBody = {
       model: this.modelId,  // 使用实际传入的 modelId（标准版或Fast版）
       input,
       duration: clampedDuration,
@@ -123,6 +128,8 @@ export class DMXAPIVideoAdapter {
       resolution,
       generate_audio: true,
     };
+    console.log(`[DMXAPIVideoAdapter] Seedance请求体: duration=${clampedDuration}, ratio=${ratio}, resolution=${resolution}, generate_audio=true, model=${this.modelId}`);
+    return seedanceBody;
   }
 
   /** 构建 Kling V3 提交请求体 (input是对象格式)
@@ -137,12 +144,17 @@ export class DMXAPIVideoAdapter {
     const resSize = this.getResolutionSize(resolution);
     const width = params?.width ?? resSize.width;
     const height = params?.height ?? resSize.height;
-    let aspectRatio = "16:9";
-    if (height > width) {
-      aspectRatio = "9:16";
-    } else if (width === height) {
-      aspectRatio = "1:1";
-    }
+    // 精确匹配比例字符串
+    let aspectRatio: string;
+    const w = width, h = height;
+    if (Math.abs(w / h - 16 / 9) < 0.1) aspectRatio = "16:9";
+    else if (Math.abs(w / h - 9 / 16) < 0.1) aspectRatio = "9:16";
+    else if (Math.abs(w / h - 1) < 0.1) aspectRatio = "1:1";
+    else if (Math.abs(w / h - 4 / 3) < 0.1) aspectRatio = "4:3";
+    else if (Math.abs(w / h - 3 / 4) < 0.1) aspectRatio = "3:4";
+    else if (Math.abs(w / h - 2) < 0.1) aspectRatio = "2:1";
+    else if (Math.abs(w / h - 0.5) < 0.1) aspectRatio = "1:2";
+    else aspectRatio = w > h ? "16:9" : "9:16";
 
     // resolution → mode 映射：720p→std, 1080p→pro
     const mode = resolution === "1080p" ? "pro" : "std";
@@ -168,7 +180,7 @@ export class DMXAPIVideoAdapter {
       }
     }
 
-    return {
+    const klingBody = {
       model: "kling-v3-video-generation",
       input: inputObj,
       parameters: {
@@ -178,6 +190,8 @@ export class DMXAPIVideoAdapter {
         audio: true,
       },
     };
+    console.log(`[DMXAPIVideoAdapter] Kling请求体: duration=${clampedDuration}, mode=${mode}, aspect_ratio=${aspectRatio}, audio=true`);
+    return klingBody;
   }
 
   /** 构建 Sora-2 multipart/form-data 请求 (POST /v1/videos)

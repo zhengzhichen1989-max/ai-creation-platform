@@ -15,6 +15,8 @@ import {
 import DownloadIcon from '@mui/icons-material/Download';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import type { StoryboardFrame } from '@/types/shouzuo';
 
 interface StoryboardViewProps {
@@ -22,7 +24,12 @@ interface StoryboardViewProps {
   isGenerating: boolean;
   regeneratingFrameIndex: number | null;
   onConfirm: () => void;
-  onRegenerateFrame: (frameIndex: number, feedback?: string) => void;
+  onRegenerateFrame?: (frameIndex: number, feedback?: string) => void;
+  onRegenerate?: (count: number, feedback?: string) => void;
+  firstFrameIndex?: number;
+  lastFrameIndex?: number;
+  onFirstFrameChange?: (index: number) => void;
+  onLastFrameChange?: (index: number) => void;
 }
 
 export default function StoryboardView({
@@ -31,6 +38,11 @@ export default function StoryboardView({
   regeneratingFrameIndex,
   onConfirm,
   onRegenerateFrame,
+  onRegenerate: _onRegenerate,
+  firstFrameIndex = 0,
+  lastFrameIndex = 0,
+  onFirstFrameChange,
+  onLastFrameChange,
 }: StoryboardViewProps) {
   const [previewFrame, setPreviewFrame] = useState<StoryboardFrame | null>(null);
   const [downloadingFrame, setDownloadingFrame] = useState<number | null>(null);
@@ -222,6 +234,64 @@ export default function StoryboardView({
                 {frame.description?.substring(0, 24)}
               </Typography>
             </Box>
+
+            {/* 首帧/尾帧选择标记 */}
+            {onFirstFrameChange && onLastFrameChange && (
+              <Box sx={{ position: 'absolute', top: 4, left: 4, display: 'flex', gap: 0.5 }}>
+                <Box
+                  component="button"
+                  onClick={(e) => { e.stopPropagation(); onFirstFrameChange(frame.index); }}
+                  sx={{
+                    px: 0.75,
+                    py: 0.25,
+                    borderRadius: 1,
+                    border: 'none',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    lineHeight: 1.4,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 0.25,
+                    bgcolor: firstFrameIndex === frame.index ? '#e91e63' : 'rgba(0,0,0,0.55)',
+                    color: 'white',
+                    transition: 'background-color 0.2s',
+                    '&:hover': { bgcolor: firstFrameIndex === frame.index ? '#c2185b' : 'rgba(0,0,0,0.75)' },
+                    zIndex: 4,
+                  }}
+                >
+                  {firstFrameIndex === frame.index ? <RadioButtonCheckedIcon sx={{ fontSize: 12 }} /> : <RadioButtonUncheckedIcon sx={{ fontSize: 12 }} />}
+                  首帧
+                </Box>
+                {storyboard.frames.length > 1 && (
+                  <Box
+                    component="button"
+                    onClick={(e) => { e.stopPropagation(); onLastFrameChange(frame.index); }}
+                    sx={{
+                      px: 0.75,
+                      py: 0.25,
+                      borderRadius: 1,
+                      border: 'none',
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      lineHeight: 1.4,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.25,
+                      bgcolor: lastFrameIndex === frame.index ? '#3f51b5' : 'rgba(0,0,0,0.55)',
+                      color: 'white',
+                      transition: 'background-color 0.2s',
+                      '&:hover': { bgcolor: lastFrameIndex === frame.index ? '#303f9f' : 'rgba(0,0,0,0.75)' },
+                      zIndex: 4,
+                    }}
+                  >
+                    {lastFrameIndex === frame.index ? <RadioButtonCheckedIcon sx={{ fontSize: 12 }} /> : <RadioButtonUncheckedIcon sx={{ fontSize: 12 }} />}
+                    尾帧
+                  </Box>
+                )}
+              </Box>
+            )}
           </ImageListItem>
         )})}
       </ImageList>
@@ -318,7 +388,7 @@ export default function StoryboardView({
               variant="contained"
               onClick={() => {
                 if (editingFrameIndex !== null) {
-                  onRegenerateFrame(editingFrameIndex, editingFeedback || undefined);
+                  onRegenerateFrame?.(editingFrameIndex, editingFeedback || undefined);
                 }
                 setEditingFrameIndex(null);
                 setPopoverAnchor(null);

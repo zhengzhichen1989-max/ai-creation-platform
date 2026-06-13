@@ -35,6 +35,7 @@ import StyleSelector from '@/components/ShouzuoVideo/StyleSelector';
 import StoryboardView from '@/components/ShouzuoVideo/StoryboardView';
 import VideoResultView from '@/components/ShouzuoVideo/VideoResultView';
 import CopywritingResultView from '@/components/ShouzuoVideo/CopywritingResultView';
+import ItemLockSelector from '@/components/ShouzuoVideo/ItemLockSelector';
 
 export default function ShouzuoVideoPage() {
   const navigate = useNavigate();
@@ -84,6 +85,12 @@ export default function ShouzuoVideoPage() {
     getSelectedCopywriting,
     getSelectedVideoUrl,
     stopPolling,
+    lockedItems,
+    detectingItemCategory,
+    isItemDetecting,
+    lockItem,
+    unlockItem,
+    initLockedItems,
   } = useShouzuoVideo();
 
   const { uploadedUrls, setUploadedFiles, reset, setFirstFrameIndex: storeSetFirstFrameIndex, setLastFrameIndex: storeSetLastFrameIndex } = useShouzuoVideoStore();
@@ -571,6 +578,16 @@ export default function ShouzuoVideoPage() {
       case 'confirm_board':
         return (
           <Box>
+            {/* Phase 1: 商品锁定选择器 */}
+            <ItemLockSelector
+              lockedItems={lockedItems}
+              detectingItemCategory={detectingItemCategory}
+              isItemDetecting={isItemDetecting}
+              onLockItem={lockItem}
+              onUnlockItem={unlockItem}
+              onInitLockedItems={initLockedItems}
+            />
+
             <Paper variant="outlined" sx={{ p: 2.5, mb: 2, borderColor: 'primary.main', borderWidth: 2 }}>
               <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 0.5 }}>
                 🎬 选择视频生成模型
@@ -720,8 +737,8 @@ export default function ShouzuoVideoPage() {
               </Box>
             </Paper>
 
-            {/* 首尾帧选择引导提示 */}
-            {storyboard && (
+            {/* 首尾帧选择引导提示（Kling多段拼接模式自动隐藏） */}
+            {storyboard && !(videoModel?.startsWith('kling') && (storyboard.totalFrames ?? 0) >= 3) && (
               <Paper
                 variant="outlined"
                 sx={{
@@ -758,8 +775,8 @@ export default function ShouzuoVideoPage() {
                 }}
                 firstFrameIndex={firstFrameIndex}
                 lastFrameIndex={lastFrameIndex}
-                onFirstFrameChange={(index) => { setFirstFrameIndex(index); storeSetFirstFrameIndex(index); }}
-                onLastFrameChange={(index) => { setLastFrameIndex(index); storeSetLastFrameIndex(index); }}
+                onFirstFrameChange={videoModel?.startsWith('kling') && (storyboard.totalFrames ?? 0) >= 3 ? undefined : (index) => { setFirstFrameIndex(index); storeSetFirstFrameIndex(index); }}
+                onLastFrameChange={videoModel?.startsWith('kling') && (storyboard.totalFrames ?? 0) >= 3 ? undefined : (index) => { setLastFrameIndex(index); storeSetLastFrameIndex(index); }}
               />
             )}
           </Box>

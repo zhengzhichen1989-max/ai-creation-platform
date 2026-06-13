@@ -1,51 +1,57 @@
 import { useCallback, useRef } from 'react';
 import { useShouzuoVideoStore } from '@/stores/shouzuoVideo.store';
 import * as shouzuoApi from '@/api/shouzuoVideo';
-import type { CopywritingItem, ProductInfo } from '@/types/shouzuo';
+import type { CopywritingItem, ProductInfo, VideoParams, StoryboardFrame } from '@/types/shouzuo';
 
 /**
- * 种草视频主流程 Hook
- * 编排 8 步工作流：上传 → 分析 → 选风格 → 故事板 → 确认 → 生成视频 → 文案 → 下载
+ * 种草视频主流程 Hook（6步工作流）
+ * Step 1: 上传产品图 → 创建会话
+ * Step 2: AI 识别产品图 + 风格推荐
+ * Step 3: 确认视频参数 + 预扣积分
+ * Step 4: 生成故事板
+ * Step 5: 生成视频
+ * Step 6: AI 文案生成
  */
 export function useShouzuoVideo() {
   const {
     session,
     uploadedFiles,
     uploadedUrls,
-    recommendedStyles,
-    analysisResult,
+    productInfo,
+    aiRecognition,
+    isAnalyzing,
+    userEditedClothing,
     selectedStyle,
+    videoParams,
     storyboard,
-    videoResult,
-    copywritingItems,
-    currentStep,
     isStoryboardGenerating,
+    videoResult,
     isVideoGenerating,
     isVideoPolling,
+    copywritingItems,
     isCopywritingGenerating,
     videoModel,
     error,
     setStep,
     setSession,
+    setUploadedFiles,
     setUploadedUrls,
     setProductInfo,
-    setRecommendedStyles,
-    setAnalysisResult,
+    setAiRecognition,
+    setIsAnalyzing,
+    setUserEditedClothing,
     setSelectedStyle,
+    setVideoParams,
     setStoryboard,
     setStoryboardGenerating,
     setVideoResult,
     setVideoGenerating,
     setVideoPolling,
-    setCopywritingItems,
-    toggleCopywritingSelect,
-    setCopywritingGenerating,
     setVideoModel,
+    setCopywritingItems,
+    setCopywritingGenerating,
     setError,
-    startStoryboardRegenerate,
-    finishStoryboardRegenerate,
-    regeneratingFrameIndex,
-    setRegeneratingFrame,
+    reset,
   } = useShouzuoVideoStore();
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -59,150 +65,147 @@ export function useShouzuoVideo() {
     setVideoPolling(false);
   }, [setVideoPolling]);
 
-  /** Step 1+2: 上传图片 → 分析 → 风格推荐 */
-  const startAnalysis = useCallback(async (imageUrls: string[], productInfo?: ProductInfo) => {
+  // ============================================================
+  // Step 1: 上传产品图 → 创建会话
+  // ============================================================
+
+  const startSession = useCallback(async (files: File[], info?: ProductInfo) => {
     try {
       setError(null);
-      setStep('analyze');
-      setUploadedUrls(imageUrls);
-      if (productInfo) {
-        setProductInfo(productInfo);
-      }
+      setUploadedFiles(files);
+      setProductInfo(info || null);
 
-      const result = await shouzuoApi.startSession({ images: imageUrls, productInfo });
+      // 上传图片到服务器
+      const urls = await shouzuoApi.uploadImages(files);
+      setUploadedUrls(urls);
+
+      // 创建会话
+      const result = await shouzuoApi.createSession({ images: urls, productInfo: info });
       setSession(result);
+      setStep('ai_recognize');
 
-      // 获取分析结果 + 风格推荐（Qwen3-Max Vision）
-      const analysis = await shouzuoApi.analyzeImages(result.sessionId);
-      setRecommendedStyles(analysis.recommendedStyles);
-      setAnalysisResult(analysis);
-
-      setStep('select_style');
+      return result;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '图片分析失败，请重试';
+      const msg = err instanceof Error ? err.message : '创建会话失败';
       setError(msg);
-      setStep('upload');
+      throw err;
     }
-  }, [setError, setStep, setUploadedUrls, setProductInfo, setSession, setRecommendedStyles]);
+  }, [setError, setStep, setSession, setUploadedFiles, setUploadedUrls, setProductInfo]);
 
-  /** Step 3: 选择风格模板 */
-  const selectStyle = useCallback(async (styleId: string) => {
+  // ============================================================
+  // Step 2: AI 识别产品图 + 风格推荐
+  // ============================================================
+
+  const analyzeImages = useCallback(async () => {
+    try {
+      setError(null);
+      setIsAnalyzing(true);
+      if (!session) throw new Error('会话不存在');
+
+      const result = await shouzuoApi.analyzeImages(session.sessionId);
+      setAiRecognition(result);
+
+      setStep('video_params');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'AI识别失败';
+      setError(msg);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [session, setError, setStep, setAiRecognition, setIsAnalyzing]);
+
+  /** 用户编辑服装信息 */
+  const saveUserEditedClothing = useCallback(async (clothing: typeof userEditedClothing) => {
     try {
       setError(null);
       if (!session) throw new Error('会话不存在');
 
-      const style = await shouzuoApi.selectStyle({ sessionId: session.sessionId, styleId });
-      setSelectedStyle(style);
-      setStep('storyboard');
+      await shouzuoApi.saveAiRecognition(session.sessionId, clothing);
+      setUserEditedClothing(clothing);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '选择风格失败';
+      const msg = err instanceof Error ? err.message : '保存失败';
       setError(msg);
     }
-  }, [session, setError, setSelectedStyle, setStep]);
+  }, [session, setError, setUserEditedClothing]);
 
-  /** Step 4: 生成故事板 (GPT-Image-2, 4-8帧) */
-  const generateStoryboard = useCallback(async (frameCount: number, productDescription?: string) => {
+  // ============================================================
+  // Step 3: 确认视频参数 + 预扣积分
+  // ============================================================
+
+  const confirmVideoParams = useCallback(async (params: VideoParams) => {
+    try {
+      setError(null);
+      if (!session) throw new Error('会话不存在');
+      if (!selectedStyle) throw new Error('请先选择风格');
+
+      const result = await shouzuoApi.confirmVideoParams(session.sessionId, params);
+      setVideoParams(params);
+      setStep('storyboard');
+
+      return result;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '确认参数失败';
+      setError(msg);
+      throw err;
+    }
+  }, [session, selectedStyle, setError, setStep, setVideoParams]);
+
+  // ============================================================
+  // Step 4: 生成故事板
+  // ============================================================
+
+  const generateStoryboard = useCallback(async (storyboardCount: number) => {
     try {
       setError(null);
       setStoryboardGenerating(true);
-      if (!session || !selectedStyle) throw new Error('请先选择风格');
+      if (!session) throw new Error('会话不存在');
 
       const result = await shouzuoApi.generateStoryboard({
         sessionId: session.sessionId,
-        styleId: selectedStyle.id,
-        styleName: selectedStyle.name,
-        frameCount,
-        productDescription,
+        storyboardCount,
+        userEditedClothing: userEditedClothing || undefined,
       });
 
       setStoryboard(result);
-      setStep('confirm_board');
+      setStep('video');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '故事板生成失败';
       setError(msg);
     } finally {
       setStoryboardGenerating(false);
     }
-  }, [session, selectedStyle, setError, setStoryboardGenerating, setStoryboard, setStep]);
+  }, [session, userEditedClothing, setError, setStep, setStoryboard, setStoryboardGenerating]);
 
-  /** Step 4 alt: 不满意，重新生成故事板 */
-  const regenerateStoryboard = useCallback(async (frameCount: number, feedback?: string) => {
+  // ============================================================
+  // Step 5: 生成视频
+  // ============================================================
+
+  const generateVideo = useCallback(async () => {
     try {
       setError(null);
-      // 原子操作：单次 render 同时清空旧数据 + 设置 loading
-      startStoryboardRegenerate();
-      if (!session || !selectedStyle) throw new Error('请先选择风格');
-
-      const result = await shouzuoApi.regenerateStoryboard({
-        sessionId: session.sessionId,
-        styleId: selectedStyle.id,
-        styleName: selectedStyle.name,
-        frameCount,
-        feedback,
-      });
-
-      // 原子操作：单次 render 同时写入新数据 + 停止 loading
-      finishStoryboardRegenerate(result);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '重新生成故事板失败';
-      setError(msg);
-      setStoryboardGenerating(false);
-    }
-  }, [session, selectedStyle, setError, startStoryboardRegenerate, finishStoryboardRegenerate, setStoryboardGenerating]);
-
-  /** Step 4 alt: 重新生成单个分镜帧 */
-  const regenerateSingleFrame = useCallback(async (frameIndex: number, feedback?: string) => {
-    try {
-      setError(null);
-      setRegeneratingFrame(frameIndex);
-      if (!session || !selectedStyle) throw new Error('请先选择风格');
-
-      const result = await shouzuoApi.regenerateSingleFrame({
-        sessionId: session.sessionId,
-        styleId: selectedStyle.id,
-        styleName: selectedStyle.name,
-        frameIndex,
-        feedback,
-      });
-
-      // 原子更新 storyboard
-      finishStoryboardRegenerate(result);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '重新生成分镜失败';
-      setError(msg);
-    } finally {
-      setRegeneratingFrame(null);
-    }
-  }, [session, selectedStyle, setError, setRegeneratingFrame, finishStoryboardRegenerate]);
-
-  /** Step 5→6: 确认故事板，开始生成视频 */
-  const confirmStoryboardAndGenerateVideo = useCallback(async (duration?: number, resolution?: string, firstFrameIndex?: number, lastFrameIndex?: number, resolutionQuality?: string) => {
-    try {
-      setError(null);
-      setStep('generate');
       setVideoGenerating(true);
       if (!session || !storyboard) throw new Error('请先生成故事板');
 
-      const result = await shouzuoApi.generateShouzuoVideo({
+      const result = await shouzuoApi.generateVideo({
         sessionId: session.sessionId,
-        storyboardFrames: storyboard.frames,
-        styleName: selectedStyle?.name ?? '',
-        modelId: videoModel,
-        duration,
-        resolution,
-        resolutionQuality,
-        firstFrameIndex,
-        lastFrameIndex,
+        model: videoModel,
+        resolution: videoParams?.resolution || '720p',
+        storyboardFrames: storyboard.frames.map((f) => ({
+          seq: f.seq,
+          name: f.name,
+          prompt: f.prompt,
+          imageUrl: f.imageUrl || '',
+        })),
       });
 
       setVideoResult(result);
 
       // 轮询视频生成状态
-      if (result.status === 'pending' || result.status === 'processing') {
+      if (result.status === 'processing' || result.status === 'pending') {
         setVideoPolling(true);
         pollingRef.current = setInterval(async () => {
           try {
-            const updated = await shouzuoApi.getVideoTask(session.sessionId);
+            const updated = await shouzuoApi.getVideoStatus(session.sessionId);
             setVideoResult(updated);
 
             if (updated.status === 'completed') {
@@ -210,7 +213,7 @@ export function useShouzuoVideo() {
               setStep('copywriting');
             } else if (updated.status === 'failed') {
               stopPolling();
-              setError(updated.errorMessage ?? '视频生成失败');
+              setError(updated.errorMessage || '视频生成失败');
             }
           } catch {
             // 轮询错误静默处理
@@ -224,40 +227,54 @@ export function useShouzuoVideo() {
       setError(msg);
       setVideoGenerating(false);
     }
-  }, [session, storyboard, selectedStyle, setError, setStep, setVideoGenerating, setVideoResult, setVideoPolling, stopPolling]);
+  }, [session, storyboard, videoModel, videoParams, setError, setStep, setVideoResult, setVideoGenerating, setVideoPolling, stopPolling]);
 
-  /** Step 7: 生成AI文案 */
-  const generateCopywriting = useCallback(async (productDescription?: string) => {
+  // ============================================================
+  // Step 6: 生成 AI 文案
+  // ============================================================
+
+  const generateCopywriting = useCallback(async () => {
     try {
       setError(null);
       setCopywritingGenerating(true);
-      if (!session || !videoResult?.videoUrl) throw new Error('请先生成视频');
+      if (!session) throw new Error('会话不存在');
 
-      const items = await shouzuoApi.generateCopywriting({
+      const result = await shouzuoApi.generateCopywriting({
         sessionId: session.sessionId,
-        videoUrl: videoResult.videoUrl,
-        styleName: selectedStyle?.name ?? '',
-        productDescription,
+        userEditedClothing: userEditedClothing || undefined,
       });
 
+      // 转换为 CopywritingItem 数组
+      const items: CopywritingItem[] = [{
+        index: 0,
+        title: result.title,
+        body: result.content,
+        hashtags: result.tags,
+        platform: 'xiaohongshu',
+        selected: true,
+      }];
+
       setCopywritingItems(items);
-      setStep('download');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '文案生成失败';
       setError(msg);
     } finally {
       setCopywritingGenerating(false);
     }
-  }, [session, videoResult, selectedStyle, setError, setCopywritingGenerating, setCopywritingItems, setStep]);
+  }, [session, userEditedClothing, setError, setCopywritingItems, setCopywritingGenerating]);
 
-  /** 获取选中文案的文本（用于下载） */
+  // ============================================================
+  // 工具函数
+  // ============================================================
+
+  /** 获取选中文案的文本 */
   const getSelectedCopywriting = useCallback((): CopywritingItem[] => {
     return copywritingItems.filter((item) => item.selected);
   }, [copywritingItems]);
 
-  /** 选中视频URL */
-  const getSelectedVideoUrl = useCallback((): string | null => {
-    return videoResult?.videoUrl ?? null;
+  /** 获取视频 URL */
+  const getVideoUrl = useCallback((): string | null => {
+    return videoResult?.videoUrl || null;
   }, [videoResult]);
 
   return {
@@ -265,33 +282,34 @@ export function useShouzuoVideo() {
     session,
     uploadedFiles,
     uploadedUrls,
-    recommendedStyles,
-    analysisResult,
+    productInfo,
+    aiRecognition,
+    isAnalyzing,
+    userEditedClothing,
     selectedStyle,
+    videoParams,
     storyboard,
-    videoResult,
-    copywritingItems,
-    currentStep,
     isStoryboardGenerating,
+    videoResult,
     isVideoGenerating,
     isVideoPolling,
+    copywritingItems,
     isCopywritingGenerating,
     videoModel,
-    regeneratingFrameIndex,
     error,
 
     // Actions
-    startAnalysis,
-    selectStyle,
+    startSession,
+    analyzeImages,
+    saveUserEditedClothing,
+    confirmVideoParams,
     generateStoryboard,
-    regenerateStoryboard,
-    regenerateSingleFrame,
-    confirmStoryboardAndGenerateVideo,
+    generateVideo,
     generateCopywriting,
-    toggleCopywritingSelect,
     setVideoModel,
     getSelectedCopywriting,
-    getSelectedVideoUrl,
+    getVideoUrl,
     stopPolling,
+    reset,
   };
 }

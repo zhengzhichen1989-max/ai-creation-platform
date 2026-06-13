@@ -25,7 +25,7 @@ const updates = [
   {
     id: "kling-v3-video-generation",
     resolution_options: '["720p","1080p"]',
-    resolution_pricing: '{"720p":{"5":0,"10":0,"15":0},"1080p":{"5":11,"10":20,"15":29}}',
+    resolution_pricing: '{"720p":{"5":0,"10":0,"15":0},"1080p":{"5":15,"10":30,"15":45}}',
   },
 ];
 

@@ -1,16 +1,18 @@
-import { Box, Typography, Card, CardMedia, LinearProgress, Chip } from '@mui/material';
+import { Box, Typography, Card, CardMedia, LinearProgress, Chip, Button } from '@mui/material';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
+import DownloadIcon from '@mui/icons-material/Download';
 import type { ShouzuoVideoResult } from '@/types/shouzuo';
 
 interface VideoResultViewProps {
   result: ShouzuoVideoResult | null;
   isGenerating: boolean;
   isPolling: boolean;
+  onDownload?: () => void;
 }
 
-export default function VideoResultView({ result, isGenerating, isPolling }: VideoResultViewProps) {
+export default function VideoResultView({ result, isGenerating, isPolling, onDownload }: VideoResultViewProps) {
   // 初始加载
   if ((isGenerating || isPolling) && !result) {
     return (
@@ -25,22 +27,41 @@ export default function VideoResultView({ result, isGenerating, isPolling }: Vid
 
   // 生成中
   if (result && (result.status === 'pending' || result.status === 'processing')) {
+    const isMultiSegment = (result.segmentCount ?? 0) > 0;
     return (
       <Box sx={{ textAlign: 'center', py: 4 }}>
         <Typography variant="h6" sx={{ mb: 1 }}>
           <PlayCircleIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
-          正在生成种草视频
+          {isMultiSegment
+            ? `正在生成种草视频 (${result.segmentCompleted}/${result.segmentCount} 段)`
+            : '正在生成种草视频'}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          基于故事板分镜生成 5-15 秒动态视频
+          {isMultiSegment
+            ? `多段拼接 · 每段镜头独立生成后自动拼接 · 每个分镜100%保留`
+            : '基于故事板分镜生成 5-15 秒动态视频'}
         </Typography>
+        {isMultiSegment && (
+          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mb: 2, flexWrap: 'wrap' }}>
+            {Array.from({ length: result.segmentCount! }, (_, i) => (
+              <Box
+                key={i}
+                sx={{
+                  width: 48, height: 10, borderRadius: 5,
+                  bgcolor: i < (result.segmentCompleted ?? 0) ? 'success.main' : 'grey.300',
+                  transition: 'background-color 0.3s ease',
+                }}
+              />
+            ))}
+          </Box>
+        )}
         <LinearProgress
           variant="determinate"
           value={result.progress}
           sx={{ maxWidth: 400, mx: 'auto', height: 8, borderRadius: 4 }}
         />
         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-          {result.progress}%
+          {isMultiSegment ? `${result.progress}%` : `${result.progress}%`}
         </Typography>
       </Box>
     );
@@ -69,7 +90,6 @@ export default function VideoResultView({ result, isGenerating, isPolling }: Vid
           component="video"
           src={result.videoUrl}
           controls
-          controlsList="nodownload"
           poster={result.thumbnailUrl || undefined}
           sx={{
             width: '100%',
@@ -81,10 +101,21 @@ export default function VideoResultView({ result, isGenerating, isPolling }: Vid
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <CheckCircleIcon color="success" fontSize="small" />
             <Typography variant="subtitle2">
-              视频生成完成
+              视频生成完成 {result.segmentCount ? `(${result.segmentCount}段拼接)` : ''}
             </Typography>
             <Chip label={`${result.duration}秒`} size="small" variant="outlined" />
           </Box>
+          {onDownload && (
+            <Button
+              variant="contained"
+              startIcon={<DownloadIcon />}
+              onClick={onDownload}
+              fullWidth
+              sx={{ mt: 1.5 }}
+            >
+              下载视频
+            </Button>
+          )}
         </Box>
       </Card>
     );

@@ -69,17 +69,28 @@ export async function sendSmsCode(phone: string): Promise<string> {
   try {
     const smsClient = await getClient();
     const $Dysmsapi20170525 = await import("@alicloud/dysmsapi20170525");
-    await smsClient.sendSms(
-      new $Dysmsapi20170525.SendSmsRequest({
-        phoneNumbers: phone,
-        signName: config.sms.signName,
-        templateCode: config.sms.templateCode,
-        templateParam: JSON.stringify({ code }),
-      })
-    );
+    const request = new $Dysmsapi20170525.SendSmsRequest({
+      phoneNumbers: phone,
+      signName: config.sms.signName,
+      templateCode: config.sms.templateCode,
+      templateParam: JSON.stringify({ code }),
+    });
+    console.log("[sms] 发送请求:", JSON.stringify({ phone, signName: config.sms.signName, templateCode: config.sms.templateCode }));
+    const response = await smsClient.sendSms(request);
+    console.log("[sms] 发送响应:", JSON.stringify(response));
+    
+    // 检查阿里云返回的错误码
+    const body = response.body || {};
+    if (body.code !== 'OK') {
+      console.error("[sms] 阿里云返回错误:", body.code, body.message);
+      throw new Error(`阿里云短信错误: ${body.message || body.code}`);
+    }
+    
+    console.log(`[sms] 发送成功: ${code} → ${phone}`);
     return code;
   } catch (err: any) {
-    console.error("[sms] 发送失败:", err.message);
+    console.error("[sms] 发送失败: err.message=", err.message, "err.code=", err.code);
+    if (err.body) console.error("[sms] err.body=", err.body.toString());
     throw new SmsSendError("短信发送失败，请稍后再试");
   }
 }
