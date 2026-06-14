@@ -65,13 +65,23 @@ export async function saveAiRecognition(
   });
 }
 
+/** 服装预处理（平铺图 → 穿着效果图） */
+export async function preprocessImage(sessionId: string): Promise<{ preprocessedImageUrl: string; status: string }> {
+  const res = await apiClient.post<ApiResponse<{ preprocessedImageUrl: string; status: string }>>(
+    `/shouzuo/session/${sessionId}/preprocess`,
+    {},
+    { timeout: 120000 },
+  );
+  return res.data.data;
+}
+
 // ============================================================
 // Step 3: 确认视频参数 + 预扣积分
 // ============================================================
 
 /** 确认视频参数 + 预扣积分 */
 export async function confirmVideoParams(sessionId: string, params: VideoParams): Promise<void> {
-  await apiClient.post<ApiResponse<void>>('/shouzuo/video/confirm-params', {
+  await apiClient.post<ApiResponse<void>>(`/shouzuo/session/${sessionId}/confirm-params`, {
     sessionId,
     videoParams: params,
   });
@@ -89,7 +99,7 @@ export async function generateStoryboard(params: GenerateStoryboardParams): Prom
   return res.data.data;
 }
 
-/** 重新生成故事板 */
+/** 重新生成故事板（支持单帧） */
 export async function regenerateStoryboard(params: GenerateStoryboardParams & { feedback?: string }): Promise<Storyboard> {
   const res = await apiClient.post<ApiResponse<Storyboard>>('/shouzuo/storyboard/regenerate', params, {
     timeout: 600000,

@@ -20,6 +20,9 @@ export function useShouzuoVideo() {
     productInfo,
     aiRecognition,
     isAnalyzing,
+    needsPreprocessing,
+    preprocessedImageUrl,
+    preprocessingStatus,
     userEditedClothing,
     selectedStyle,
     videoParams,
@@ -39,6 +42,9 @@ export function useShouzuoVideo() {
     setProductInfo,
     setAiRecognition,
     setIsAnalyzing,
+    setNeedsPreprocessing,
+    setPreprocessedImageUrl,
+    setPreprocessingStatus,
     setUserEditedClothing,
     setSelectedStyle,
     setVideoParams,
@@ -64,6 +70,16 @@ export function useShouzuoVideo() {
     }
     setVideoPolling(false);
   }, [setVideoPolling]);
+
+  /** 获取风格模板列表（页面加载时调用） */
+  const fetchStyleTemplates = useCallback(async () => {
+    try {
+      const templates = await shouzuoApi.getStyleTemplates();
+      useShouzuoVideoStore.getState().setStyleTemplates(templates);
+    } catch {
+      // 静默处理
+    }
+  }, []);
 
   // ============================================================
   // Step 1: 上传产品图 → 创建会话
@@ -100,33 +116,78 @@ export function useShouzuoVideo() {
     try {
       setError(null);
       setIsAnalyzing(true);
-      if (!session) throw new Error('会话不存在');
+      // 直接从 store 获取最新 session（避免闭包陈旧值问题）
+      const currentSession = useShouzuoVideoStore.getState().session;
+      if (!currentSession) throw new Error('会话不存在');
 
-      const result = await shouzuoApi.analyzeImages(session.sessionId);
+      const result = await shouzuoApi.analyzeImages(currentSession.sessionId);
       setAiRecognition(result);
 
-      setStep('video_params');
+      // 设置是否需要预处理（平铺图 → 需要生成穿着效果图）
+      setNeedsPreprocessing(result.needs_preprocessing === true);
+
+      // 自动选中最高置信度的推荐风格模板
+      if (result.recommendations && result.recommendations.length > 0) {
+        const templates = useShouzuoVideoStore.getState().styleTemplates;
+        const topRec = result.recommendations[0]; // 已按置信度降序
+        const matchedTemplate = templates.find((t) => t.style_id === topRec.style_id);
+        if (matchedTemplate) {
+          setSelectedStyle(matchedTemplate);
+        } else if (templates.length > 0) {
+          // 没匹配到则选第一个模板
+          setSelectedStyle(templates[0]);
+        }
+      }
+
+      // 停在 ai_recognize 步骤，让用户查看/修改识别结果
+      setStep('ai_recognize');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'AI识别失败';
       setError(msg);
     } finally {
       setIsAnalyzing(false);
     }
-  }, [session, setError, setStep, setAiRecognition, setIsAnalyzing]);
+  }, [setError, setStep, setAiRecognition, setIsAnalyzing, setSelectedStyle, setNeedsPreprocessing]);
+
+  /** Step 2.5: 服装预处理（平铺图 → 穿着效果图） */
+  const preprocessImage = useCallback(async () => {
+    try {
+      setError(null);
+      setPreprocessingStatus('generating');
+      const currentSession = useShouzuoVideoStore.getState().session;
+      if (!currentSession) throw new Error('会话不存在');
+
+      const result = await shouzuoApi.preprocessImage(currentSession.sessionId);
+      setPreprocessedImageUrl(result.preprocessedImageUrl);
+      setPreprocessingStatus('completed');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '预处理生成失败';
+      setError(msg);
+      setPreprocessingStatus('failed');
+    }
+  }, [setError, setPreprocessedImageUrl, setPreprocessingStatus]);
+
+  /** 跳过预处理，直接用原图 */
+  const skipPreprocessing = useCallback(() => {
+    setPreprocessingStatus('idle');
+    setPreprocessedImageUrl(null);
+    setNeedsPreprocessing(false);
+  }, [setPreprocessingStatus, setPreprocessedImageUrl, setNeedsPreprocessing]);
 
   /** 用户编辑服装信息 */
   const saveUserEditedClothing = useCallback(async (clothing: typeof userEditedClothing) => {
     try {
       setError(null);
-      if (!session) throw new Error('会话不存在');
+      const currentSession = useShouzuoVideoStore.getState().session;
+      if (!currentSession) throw new Error('会话不存在');
 
-      await shouzuoApi.saveAiRecognition(session.sessionId, clothing);
+      await shouzuoApi.saveAiRecognition(currentSession.sessionId, clothing);
       setUserEditedClothing(clothing);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '保存失败';
       setError(msg);
     }
-  }, [session, setError, setUserEditedClothing]);
+  }, [setError, setUserEditedClothing]);
 
   // ============================================================
   // Step 3: 确认视频参数 + 预扣积分
@@ -135,10 +196,10 @@ export function useShouzuoVideo() {
   const confirmVideoParams = useCallback(async (params: VideoParams) => {
     try {
       setError(null);
-      if (!session) throw new Error('会话不存在');
-      if (!selectedStyle) throw new Error('请先选择风格');
+      const currentSession = useShouzuoVideoStore.getState().session;
+      if (!currentSession) throw new Error('会话不存在');
 
-      const result = await shouzuoApi.confirmVideoParams(session.sessionId, params);
+      const result = await shouzuoApi.confirmVideoParams(currentSession.sessionId, params);
       setVideoParams(params);
       setStep('storyboard');
 
@@ -148,33 +209,54 @@ export function useShouzuoVideo() {
       setError(msg);
       throw err;
     }
-  }, [session, selectedStyle, setError, setStep, setVideoParams]);
+  }, [setError, setStep, setVideoParams]);
 
   // ============================================================
   // Step 4: 生成故事板
   // ============================================================
 
-  const generateStoryboard = useCallback(async (storyboardCount: number) => {
+  const generateStoryboard = useCallback(async (storyboardCount: number, frameIndex?: number) => {
     try {
       setError(null);
       setStoryboardGenerating(true);
-      if (!session) throw new Error('会话不存在');
+      const currentSession = useShouzuoVideoStore.getState().session;
+      const currentUserEditedClothing = useShouzuoVideoStore.getState().userEditedClothing;
+      if (!currentSession) throw new Error('会话不存在');
 
-      const result = await shouzuoApi.generateStoryboard({
-        sessionId: session.sessionId,
-        storyboardCount,
-        userEditedClothing: userEditedClothing || undefined,
-      });
+      if (frameIndex !== undefined) {
+        // 单帧重新生成：只重新生成指定帧
+        const result = await shouzuoApi.regenerateStoryboard({
+          sessionId: currentSession.sessionId,
+          storyboardCount,
+          userEditedClothing: currentUserEditedClothing || undefined,
+          frameIndex,
+        });
+        // 只更新指定帧
+        const currentStoryboard = useShouzuoVideoStore.getState().storyboard;
+        if (currentStoryboard && result.frames.length > 0) {
+          const newFrames = [...currentStoryboard.frames];
+          newFrames[frameIndex] = result.frames[0];
+          setStoryboard({ ...currentStoryboard, frames: newFrames });
+        }
+        // 不跳转步骤，用户仍在故事板页面
+      } else {
+        // 全部重新生成 → 生成完成后留在 Step 4 让用户查看/编辑分镜
+        const result = await shouzuoApi.generateStoryboard({
+          sessionId: currentSession.sessionId,
+          storyboardCount,
+          userEditedClothing: currentUserEditedClothing || undefined,
+        });
 
-      setStoryboard(result);
-      setStep('video');
+        setStoryboard(result);
+        // 不再自动跳到 'video' 步骤，用户确认后再点"确认并生成视频"
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '故事板生成失败';
       setError(msg);
     } finally {
       setStoryboardGenerating(false);
     }
-  }, [session, userEditedClothing, setError, setStep, setStoryboard, setStoryboardGenerating]);
+  }, [setError, setStep, setStoryboard, setStoryboardGenerating]);
 
   // ============================================================
   // Step 5: 生成视频
@@ -184,13 +266,18 @@ export function useShouzuoVideo() {
     try {
       setError(null);
       setVideoGenerating(true);
-      if (!session || !storyboard) throw new Error('请先生成故事板');
+      setStep('video');  // ⬅ 切到 Step 5 显示加载状态
+      const currentSession = useShouzuoVideoStore.getState().session;
+      const currentStoryboard = useShouzuoVideoStore.getState().storyboard;
+      const currentVideoModel = useShouzuoVideoStore.getState().videoModel;
+      const currentVideoParams = useShouzuoVideoStore.getState().videoParams;
+      if (!currentSession || !currentStoryboard) throw new Error('请先生成故事板');
 
       const result = await shouzuoApi.generateVideo({
-        sessionId: session.sessionId,
-        model: videoModel,
-        resolution: videoParams?.resolution || '720p',
-        storyboardFrames: storyboard.frames.map((f) => ({
+        sessionId: currentSession.sessionId,
+        model: currentVideoModel,
+        resolution: currentVideoParams?.resolution || '720p',
+        storyboardFrames: currentStoryboard.frames.map((f) => ({
           seq: f.seq,
           name: f.name,
           prompt: f.prompt,
@@ -200,12 +287,14 @@ export function useShouzuoVideo() {
 
       setVideoResult(result);
 
-      // 轮询视频生成状态
+      // 轮询视频生成状态（从 store 实时读取 session，避免闭包陈旧值）
       if (result.status === 'processing' || result.status === 'pending') {
         setVideoPolling(true);
         pollingRef.current = setInterval(async () => {
           try {
-            const updated = await shouzuoApi.getVideoStatus(session.sessionId);
+            const s = useShouzuoVideoStore.getState().session;
+            if (!s) return;
+            const updated = await shouzuoApi.getVideoStatus(s.sessionId);
             setVideoResult(updated);
 
             if (updated.status === 'completed') {
@@ -227,7 +316,7 @@ export function useShouzuoVideo() {
       setError(msg);
       setVideoGenerating(false);
     }
-  }, [session, storyboard, videoModel, videoParams, setError, setStep, setVideoResult, setVideoGenerating, setVideoPolling, stopPolling]);
+  }, [setError, setStep, setVideoResult, setVideoGenerating, setVideoPolling, stopPolling]);
 
   // ============================================================
   // Step 6: 生成 AI 文案
@@ -237,11 +326,13 @@ export function useShouzuoVideo() {
     try {
       setError(null);
       setCopywritingGenerating(true);
-      if (!session) throw new Error('会话不存在');
+      const currentSession = useShouzuoVideoStore.getState().session;
+      const currentUserEditedClothing = useShouzuoVideoStore.getState().userEditedClothing;
+      if (!currentSession) throw new Error('会话不存在');
 
       const result = await shouzuoApi.generateCopywriting({
-        sessionId: session.sessionId,
-        userEditedClothing: userEditedClothing || undefined,
+        sessionId: currentSession.sessionId,
+        userEditedClothing: currentUserEditedClothing || undefined,
       });
 
       // 转换为 CopywritingItem 数组
@@ -261,7 +352,7 @@ export function useShouzuoVideo() {
     } finally {
       setCopywritingGenerating(false);
     }
-  }, [session, userEditedClothing, setError, setCopywritingItems, setCopywritingGenerating]);
+  }, [setError, setCopywritingItems, setCopywritingGenerating]);
 
   // ============================================================
   // 工具函数
@@ -285,6 +376,9 @@ export function useShouzuoVideo() {
     productInfo,
     aiRecognition,
     isAnalyzing,
+    needsPreprocessing,
+    preprocessedImageUrl,
+    preprocessingStatus,
     userEditedClothing,
     selectedStyle,
     videoParams,
@@ -301,6 +395,9 @@ export function useShouzuoVideo() {
     // Actions
     startSession,
     analyzeImages,
+    fetchStyleTemplates,
+    preprocessImage,
+    skipPreprocessing,
     saveUserEditedClothing,
     confirmVideoParams,
     generateStoryboard,

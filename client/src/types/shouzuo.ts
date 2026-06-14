@@ -36,6 +36,7 @@ export interface StyleTemplate {
   fallback_model: string;
   default_resolution: string;
   default_storyboard_count: number;
+  default_aspect_ratio: '9:16' | '16:9' | '1:1' | '3:4';  // 默认视频比例
   cost_hint: string;
 }
 
@@ -71,6 +72,8 @@ export interface AiRecognitionResult {
   raw_json?: string;
   analyzedByAI?: boolean;
   aiError?: string;
+  image_type?: 'flat_lay' | 'worn' | 'unknown';  // 图片类型判断
+  needs_preprocessing?: boolean;                         // 是否需要预处理
 }
 
 // ============================================================
@@ -90,6 +93,7 @@ export interface VideoParams {
   model: VideoModelId;
   duration: number;       // 5-15秒
   resolution: '720p' | '1080p';
+  aspectRatio: '9:16' | '16:9' | '1:1' | '3:4';  // 视频比例
   storyboard_count: number; // 1-6
   kling_duration_splits?: number[]; // 仅 Kling 模式
 }
@@ -182,6 +186,8 @@ export interface ShouzuoSession {
   videoResult?: ShouzuoVideoResult;
   copywritingItems: CopywritingItem[];
   preDeductedCredits: number;
+  preprocessed_image_url?: string; // 预处理生成的穿着效果图 URL
+  preprocessing_status?: 'idle' | 'generating' | 'completed' | 'failed';
   createdAt: string;
 }
 
@@ -215,6 +221,7 @@ export interface GenerateStoryboardParams {
   sessionId: string;
   storyboardCount: number;
   userEditedClothing?: ClothingInfo;
+  frameIndex?: number; // 可选：仅重新生成指定帧（0-based）
 }
 
 /** 生成视频参数 */

@@ -1,27 +1,22 @@
-import { Box, Stepper, Step, StepLabel, StepIconProps } from '@mui/material';
-import { SHOUZUO_STEPS, type ShouzuoStep } from '@/types/shouzuo';
+import { Stepper, Step, StepLabel, Box, Typography } from '@mui/material';
+import type { Step as StepType } from '@/types/shouzuo';
 
 interface WorkflowStepperProps {
-  activeStep: ShouzuoStep;
+  activeStep: string;
+  steps: StepType[];
 }
 
-export default function WorkflowStepper({ activeStep }: WorkflowStepperProps) {
-  const activeIndex = SHOUZUO_STEPS.findIndex((s) => s.key === activeStep);
+export default function WorkflowStepper({ activeStep, steps }: WorkflowStepperProps) {
+  const activeIndex = steps.findIndex((s) => s.id === activeStep);
 
   return (
-    <Box sx={{ mb: 4 }}>
-      <Stepper
-        activeStep={activeIndex}
-        alternativeLabel
-        sx={{
-          '& .MuiStepLabel-label': { fontSize: '0.75rem', mt: 0.5 },
-          '& .MuiStepLabel-label.Mui-active': { fontWeight: 600, color: 'primary.main' },
-          '& .MuiStepLabel-label.Mui-completed': { color: 'success.main' },
-        }}
-      >
-        {SHOUZUO_STEPS.map((step) => (
-          <Step key={step.key} completed={SHOUZUO_STEPS.indexOf(step) < activeIndex}>
-            <StepLabel>{step.label}</StepLabel>
+    <Box sx={{ mb: 3 }}>
+      <Stepper activeStep={activeIndex} alternativeLabel>
+        {steps.map((step) => (
+          <Step key={step.id}>
+            <StepLabel>
+              <Typography variant="body2">{step.label}</Typography>
+            </StepLabel>
           </Step>
         ))}
       </Stepper>

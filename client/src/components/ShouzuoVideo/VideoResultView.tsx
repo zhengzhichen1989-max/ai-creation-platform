@@ -1,8 +1,7 @@
-import { Box, Typography, Card, CardMedia, LinearProgress, Chip, Button } from '@mui/material';
+import { Box, Typography, Card, CardMedia, LinearProgress, Chip } from '@mui/material';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
-import DownloadIcon from '@mui/icons-material/Download';
 import type { ShouzuoVideoResult } from '@/types/shouzuo';
 
 interface VideoResultViewProps {
@@ -106,18 +105,40 @@ export default function VideoResultView({ result, isGenerating, isPolling, onDow
             <Chip label={`${result.duration}秒`} size="small" variant="outlined" />
           </Box>
           {onDownload && (
-            <Button
-              variant="contained"
-              startIcon={<DownloadIcon />}
+            <button
+              type="button"
               onClick={onDownload}
-              fullWidth
-              sx={{ mt: 1.5 }}
+              style={{
+                background: '#7c3aed',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 20,
+                padding: '10px 24px',
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                width: '100%',
+                marginTop: '12px',
+                position: 'relative',
+                zIndex: 10,
+              }}
             >
-              下载视频
-            </Button>
+              ⬇️ 下载视频
+            </button>
           )}
         </Box>
       </Card>
+    );
+  }
+
+  // 无数据且不在生成中 → 显示提示（不应该到达这里，但防止白屏）
+  if (!result && !isGenerating && !isPolling) {
+    return (
+      <Box sx={{ textAlign: 'center', py: 6 }}>
+        <Typography variant="body1" color="text.secondary">
+          暂无视频数据，请先生成故事板并确认
+        </Typography>
+      </Box>
     );
   }
 

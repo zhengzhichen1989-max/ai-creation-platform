@@ -34,6 +34,12 @@ interface ShouzuoVideoState {
   // Step 2: AI 识别结果
   aiRecognition: AiRecognitionResult | null;
   isAnalyzing: boolean;
+  needsPreprocessing: boolean;
+  preprocessedImageUrl: string | null;
+  preprocessingStatus: 'idle' | 'generating' | 'completed' | 'failed';
+
+  // Step 2: 风格模板列表（页面加载时获取）
+  styleTemplates: StyleTemplate[];
 
   // Step 2: 用户编辑的服装信息
   userEditedClothing: ClothingInfo | null;
@@ -69,6 +75,10 @@ interface ShouzuoVideoState {
   // Step 2
   setAiRecognition: (result: AiRecognitionResult | null) => void;
   setIsAnalyzing: (v: boolean) => void;
+  setNeedsPreprocessing: (v: boolean) => void;
+  setPreprocessedImageUrl: (url: string | null) => void;
+  setPreprocessingStatus: (v: 'idle' | 'generating' | 'completed' | 'failed') => void;
+  setStyleTemplates: (templates: StyleTemplate[]) => void;
   setUserEditedClothing: (info: ClothingInfo | null) => void;
 
   // Step 3
@@ -108,6 +118,10 @@ const initialState = {
   // Step 2
   aiRecognition: null,
   isAnalyzing: false,
+  needsPreprocessing: false,
+  preprocessedImageUrl: null,
+  preprocessingStatus: 'idle',
+  styleTemplates: [],
   userEditedClothing: null,
 
   // Step 3
@@ -147,6 +161,10 @@ export const useShouzuoVideoStore = create<ShouzuoVideoState>((set, get) => ({
   // Step 2
   setAiRecognition: (result) => set({ aiRecognition: result }),
   setIsAnalyzing: (v) => set({ isAnalyzing: v }),
+  setNeedsPreprocessing: (v) => set({ needsPreprocessing: v }),
+  setPreprocessedImageUrl: (url) => set({ preprocessedImageUrl: url }),
+  setPreprocessingStatus: (v) => set({ preprocessingStatus: v }),
+  setStyleTemplates: (templates) => set({ styleTemplates: templates }),
   setUserEditedClothing: (info) => set({ userEditedClothing: info }),
 
   // Step 3

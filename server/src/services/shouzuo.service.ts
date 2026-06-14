@@ -31,6 +31,14 @@ export interface StyleRecommendation {
   reason: string;
 }
 
+export interface ProductLock {
+  type: string;       // 产品类型锁定
+  color: string;      // 主色锁定
+  material: string;   // 面料锁定
+  key_features: string[]; // 关键设计特征
+  en_lock_description: string; // 英文锁定描述（30-50词）
+}
+
 export interface AiRecognitionResult {
   clothing_type: string;
   material: string;
@@ -39,6 +47,9 @@ export interface AiRecognitionResult {
   style_tags: string[];
   recommendations: StyleRecommendation[];
   raw_json?: string; // GPT-4o 原始返回
+  image_type?: 'flat_lay' | 'worn' | 'unknown';  // 图片类型判断
+  needs_preprocessing?: boolean;                         // 是否需要预处理
+  product_lock?: ProductLock;                            // 产品锁定描述
 }
 
 export interface StoryboardFrame {
@@ -70,9 +81,9 @@ export interface ShouzuoSessionRow {
   id: string;
   user_id: number;
   status: string;
-  current_step: string;       // "upload"|"ai_recognize"|"video_params"|"storyboard"|"video"|"copywriting"
+  current_step: string;       // "upload"|"ai_recognize"|"preprocessing"|"video_params"|"storyboard"|"video"|"copywriting"
   uploaded_images: string;      // JSON string[]
-  ai_recognition_json: string | null;  // JSON - AiRecognitionResult
+  ai_recognition_json: string | null;  // JSON - AiRecognitionResult (含 image_type / needs_preprocessing)
   user_edited_clothing_json: string | null; // JSON - ClothingInfo (用户编辑后)
   selected_style_id: string | null;
   video_params_json: string | null;  // JSON - VideoParams
@@ -83,6 +94,8 @@ export interface ShouzuoSessionRow {
   video_error: string | null;
   copywriting_json: string | null;  // JSON - CopywritingResult
   pre_deducted_credits: number;  // Step 3 预扣积分
+  preprocessed_image_url: string | null; // 预处理生成的穿着效果图 URL
+  preprocessing_status: string | null; // "idle"|"generating"|"completed"|"failed"
   created_at: string;
   updated_at: string;
 }
@@ -420,7 +433,10 @@ export function ensureShouzuoTable(): void {
   try { db.run("ALTER TABLE shouzuo_sessions ADD COLUMN video_params_json TEXT"); } catch (_) { /* ignore */ }
   try { db.run("ALTER TABLE shouzuo_sessions ADD COLUMN video_segments_json TEXT"); } catch (_) { /* ignore */ }
   try { db.run("ALTER TABLE shouzuo_sessions ADD COLUMN pre_deducted_credits INTEGER DEFAULT 0"); } catch (_) { /* ignore */ }
-  // 清理旧字段（如果存在）
+  // v2.6 新增：服装预处理字段
+  try { db.run("ALTER TABLE shouzuo_sessions ADD COLUMN preprocessed_image_url TEXT"); } catch (_) { /* ignore */ }
+  try { db.run("ALTER TABLE shouzuo_sessions ADD COLUMN preprocessing_status TEXT DEFAULT 'idle'"); } catch (_) { /* ignore */ }
+  // 兼容：旧版本可能没有 video_segment_ids 字段
   try { db.run("ALTER TABLE shouzuo_sessions DROP COLUMN style_id"); } catch (_) { /* ignore */ }
   try { db.run("ALTER TABLE shouzuo_sessions DROP COLUMN style_name"); } catch (_) { /* ignore */ }
   try { db.run("ALTER TABLE shouzuo_sessions DROP COLUMN video_thumbnail"); } catch (_) { /* ignore */ }
@@ -465,6 +481,7 @@ const SESSION_COLUMNS = [
   "selected_style_id", "video_params_json", "storyboard_json",
   "video_status", "video_url", "video_segments_json",
   "video_error", "copywriting_json", "pre_deducted_credits",
+  "preprocessed_image_url", "preprocessing_status",
   "created_at", "updated_at",
 ];
 
@@ -486,8 +503,10 @@ function mapRowToSession(row: unknown[]): ShouzuoSessionRow {
     video_error: row[13] as string | null,
     copywriting_json: row[14] as string | null,
     pre_deducted_credits: (row[15] as number) ?? 0,
-    created_at: row[16] as string,
-    updated_at: row[17] as string,
+    preprocessed_image_url: row[16] as string | null,
+    preprocessing_status: row[17] as string | null,
+    created_at: row[18] as string,
+    updated_at: row[19] as string,
   };
 }
 
@@ -534,6 +553,8 @@ export function getSession(sessionId: string): ShouzuoSessionRow | null {
       video_error: row["video_error"] as string | null,
       copywriting_json: row["copywriting_json"] as string | null,
       pre_deducted_credits: (row["pre_deducted_credits"] as number) ?? 0,
+      preprocessed_image_url: (row["preprocessed_image_url"] as string) ?? null,
+      preprocessing_status: (row["preprocessing_status"] as string) ?? null,
       created_at: row["created_at"] as string,
       updated_at: row["updated_at"] as string,
     };
@@ -621,19 +642,18 @@ export function calculateEstimatedCredits(
   return storyboardCredits + videoCredits;
 }
 
-/** 确认视频参数 + 预扣积分 */
+/** 确认视频参数（不再预扣积分，改为生成完成后按实际扣减） */
 export function confirmVideoParams(
   sessionId: string,
   userId: number,
   videoParams: VideoParams,
-  estimatedCredits: number,
 ): void {
   const db = getDb();
   const now = new Date().toISOString();
 
   db.run(
-    "UPDATE shouzuo_sessions SET video_params_json = ?, pre_deducted_credits = ?, current_step = 'video_params', updated_at = ? WHERE id = ? AND user_id = ?",
-    [JSON.stringify(videoParams), estimatedCredits, now, sessionId, userId]
+    "UPDATE shouzuo_sessions SET video_params_json = ?, current_step = 'video_params', updated_at = ? WHERE id = ? AND user_id = ?",
+    [JSON.stringify(videoParams), now, sessionId, userId]
   );
 
   saveDatabase();
@@ -686,6 +706,41 @@ export function saveStoryboard(
     [storyboardJson, now, sessionId, userId]
   );
 
+  saveDatabase();
+}
+
+// ===========================================================
+// 服装预处理
+// ===========================================================
+
+/** 保存预处理结果（穿着效果图 URL） */
+export function savePreprocessedImage(
+  sessionId: string,
+  userId: number,
+  preprocessedImageUrl: string,
+): void {
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.run(
+    "UPDATE shouzuo_sessions SET preprocessed_image_url = ?, preprocessing_status = 'completed', current_step = 'preprocessing', updated_at = ? WHERE id = ? AND user_id = ?",
+    [preprocessedImageUrl, now, sessionId, userId]
+  );
+  saveDatabase();
+}
+
+/** 更新预处理状态 */
+export function updatePreprocessingStatus(
+  sessionId: string,
+  userId: number,
+  status: 'generating' | 'completed' | 'failed',
+  error?: string,
+): void {
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.run(
+    "UPDATE shouzuo_sessions SET preprocessing_status = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+    [status, now, sessionId, userId]
+  );
   saveDatabase();
 }
 
@@ -806,6 +861,30 @@ export function saveCopywriting(
 // 工具函数
 // ===========================================================
 
+/** 各风格的规避真人描述（追加到分镜 prompt 末尾） */
+const FACE_AVOIDANCE: Record<string, { en: string; cn: string }> = {
+  "japanese-mori": {
+    en: "Fashion photography with face naturally turned away from camera or partially hidden by hair, emphasis on garment and atmosphere.",
+    cn: "时尚摄影，面部自然转开或被发丝轻遮，重点展示服装和氛围。",
+  },
+  "street-urban": {
+    en: "Editorial fashion photography, face hidden by shadow or wearing sunglasses or cap looking down, strong emphasis on garment.",
+    cn: "时尚大片摄影，面部被阴影遮挡或佩戴墨镜/帽子低头，重点展示服装。",
+  },
+  "luxury-cinematic": {
+    en: "High-end fashion photography, face turned away from camera or silhouetted against light, emphasis on garment silhouette and fabric.",
+    cn: "高端时尚摄影，面部侧转或逆光剪影，重点展示服装轮廓和面料。",
+  },
+  "office-commute": {
+    en: "Professional fashion photography, face naturally turned to the side or partially cropped out of frame, clear focus on garment cut and fit.",
+    cn: "职业时尚摄影，面部自然微侧或局部裁出画框，清晰焦点在服装版型。",
+  },
+  "story-lifestyle": {
+    en: "Lifestyle fashion photography, face naturally turned away or partially out of frame, narrative focus on garment in daily life.",
+    cn: "生活时尚摄影，面部自然转开或局部在画框外，重点展示服装在日常场景中。",
+  },
+};
+
 /** 获取分镜提示词（合成后传入 GPT-Image-2） */
 export function buildStoryboardPrompt(
   styleId: string,
@@ -826,8 +905,10 @@ export function buildStoryboardPrompt(
     `Season: ${clothingInfo.season.join("/")}`,
   ].join(", ");
 
-  const fullPrompt = `${frame.prompt}. ${clothingStr}. Photorealistic, high quality, 8k resolution, professional product photography.`;
-  return { prompt: fullPrompt, name: frame.name };
+  const faceText = FACE_AVOIDANCE[styleId];
+  const faceSuffix = faceText ? ` ${faceText.en}` : "";
+  const prompt = `${frame.prompt}${faceSuffix}. ${clothingStr}. Photorealistic, high quality, 8k resolution, professional product photography.`;
+  return { prompt, name: frame.name };
 }
 
 /** 获取视频生成提示词 */

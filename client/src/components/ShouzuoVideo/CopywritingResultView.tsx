@@ -1,155 +1,140 @@
-import {
-  Box,
-  Typography,
-  Paper,
-  Checkbox,
-  Button,
-  FormControlLabel,
-  Chip,
-  Divider,
-} from '@mui/material';
-import DownloadIcon from '@mui/icons-material/Download';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import { Box, Typography, Paper, Checkbox, FormControlLabel, CircularProgress, Stack } from '@mui/material';
 import type { CopywritingItem } from '@/types/shouzuo';
 
-interface CopywritingResultProps {
+interface CopywritingResultViewProps {
   items: CopywritingItem[];
   onToggleSelect: (index: number) => void;
   onGenerate: () => void;
   isGenerating: boolean;
 }
 
-/** 平台配色 */
-const PLATFORM_COLORS: Record<string, string> = {
-  xiaohongshu: '#FF2442',
-  douyin: '#000000',
-  instagram: '#E1306C',
-};
-
-export default function CopywritingResult({
+export default function CopywritingResultView({
   items,
   onToggleSelect,
   onGenerate,
   isGenerating,
-}: CopywritingResultProps) {
-  const anySelected = items.some((item) => item.selected);
+}: CopywritingResultViewProps) {
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('已复制到剪贴板');
+    } catch {
+      console.warn('复制失败');
+    }
+  };
 
-  /** 复制文案 */
-  const copyItem = (item: CopywritingItem) => {
+  const handleDownload = (item: CopywritingItem) => {
     const text = `${item.title}\n\n${item.body}\n\n${item.hashtags.map((t) => `#${t}`).join(' ')}`;
-    navigator.clipboard.writeText(text);
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `copywriting_${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
     <Box>
-      <Typography variant="h6" sx={{ mb: 1 }}>
-        Step 7: AI文案
+      <Typography variant="h6" gutterBottom>
+        AI 文案生成
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        根据您的视频风格，AI 已生成多套文案，请选择您喜欢的版本
       </Typography>
 
-      {items.length === 0 ? (
+      {items.length === 0 && !isGenerating && (
         <Box sx={{ textAlign: 'center', py: 4 }}>
-          <Typography color="text.secondary" sx={{ mb: 2 }}>
-            根据视频内容和风格，AI 将自动生成小红书/抖音风格文案
-          </Typography>
-          <Button
-            variant="contained"
+          <button
+            type="button"
             onClick={onGenerate}
-            disabled={isGenerating}
+            style={{
+              background: '#7c3aed',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 20,
+              padding: '12px 32px',
+              fontSize: '15px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              position: 'relative',
+              zIndex: 10,
+            }}
           >
-            {isGenerating ? '生成中...' : '生成文案'}
-          </Button>
+            ✨ 生成 AI 文案
+          </button>
         </Box>
-      ) : (
-        <>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            AI 已生成 {items.length} 条文案，勾选你满意的，点击下载打包
+      )}
+
+      {isGenerating && (
+        <Box sx={{ textAlign: 'center', py: 4 }}>
+          <CircularProgress size={48} />
+          <Typography variant="h6" sx={{ mt: 2 }}>
+            正在生成文案...
           </Typography>
+        </Box>
+      )}
 
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 3 }}>
-            {items.map((item) => (
-              <Paper
-                key={item.index}
-                variant="outlined"
-                sx={{
-                  p: 2,
-                  borderColor: item.selected ? 'primary.main' : 'divider',
-                  borderWidth: item.selected ? 2 : 1,
-                  bgcolor: item.selected ? 'primary.50' : 'background.paper',
-                  transition: 'all 0.2s',
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={item.selected}
-                        onChange={() => onToggleSelect(item.index)}
-                        size="small"
-                      />
-                    }
-                    label=""
-                    sx={{ m: 0, p: 0 }}
+      {items.length > 0 && (
+        <Stack spacing={2}>
+          {items.map((item, index) => (
+            <Paper key={index} sx={{ p: 2 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={item.selected}
+                    onChange={() => onToggleSelect(index)}
                   />
-                  <Box sx={{ flex: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <Typography variant="subtitle2" fontWeight={600}>
-                        {item.title}
-                      </Typography>
-                      <Chip
-                        label={item.platform === 'xiaohongshu' ? '小红书' : item.platform}
-                        size="small"
-                        sx={{
-                          bgcolor: `${PLATFORM_COLORS[item.platform] || '#666'}15`,
-                          color: PLATFORM_COLORS[item.platform] || '#666',
-                          fontSize: '0.7rem',
-                        }}
-                      />
-                    </Box>
-
-                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mb: 0.5 }}>
+                }
+                label={
+                  <Box>
+                    <Typography variant="subtitle1">{item.title}</Typography>
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 1 }}>
                       {item.body}
                     </Typography>
-
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-                      {item.hashtags.map((tag) => (
-                        <Chip
-                          key={tag}
-                          label={`#${tag}`}
-                          size="small"
-                          variant="outlined"
-                          sx={{ fontSize: '0.7rem' }}
-                        />
-                      ))}
-                    </Box>
-
-                    <Button
-                      size="small"
-                      startIcon={<ContentCopyIcon fontSize="small" />}
-                      onClick={() => copyItem(item)}
-                    >
-                      复制全文
-                    </Button>
+                    <Typography variant="body2" color="primary" sx={{ mt: 1 }}>
+                      {item.hashtags.map((t) => `#${t}`).join(' ')}
+                    </Typography>
                   </Box>
-                </Box>
-              </Paper>
-            ))}
-          </Box>
+                }
+                sx={{ alignItems: 'flex-start', width: '100%' }}
+              />
 
-          <Divider sx={{ mb: 2 }} />
-
-          <Button
-            variant="contained"
-            size="large"
-            fullWidth
-            startIcon={<DownloadIcon />}
-            disabled={!anySelected}
-            sx={{ py: 1.5 }}
-          >
-            {anySelected
-              ? `下载选中的 ${items.filter((i) => i.selected).length} 条文案 + 视频`
-              : '请至少选择一条文案'}
-          </Button>
-        </>
+              <Box sx={{ display: 'flex', gap: 1, mt: 1, justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(`${item.title}\n\n${item.body}\n\n${item.hashtags.map((t) => `#${t}`).join(' ')}`)}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: 12,
+                    padding: '4px 12px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    color: '#666',
+                  }}
+                >
+                  📋 复制
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownload(item)}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: 12,
+                    padding: '4px 12px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    color: '#666',
+                  }}
+                >
+                  📥 下载
+                </button>
+              </Box>
+            </Paper>
+          ))}
+        </Stack>
       )}
     </Box>
   );

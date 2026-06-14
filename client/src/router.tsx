@@ -11,8 +11,6 @@ import AdminPage from '@/pages/AdminPage';
 import ShouzuoVideoPage from '@/pages/ShouzuoVideoPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
-import TermsPage from '@/pages/TermsPage';
-import PrivacyPage from '@/pages/PrivacyPage';
 import type { ReactNode } from 'react';
 
 /** Route guard that redirects unauthenticated users to login */
@@ -95,10 +93,6 @@ export default function AppRouter() {
           }
         />
       </Route>
-
-      {/* 服务协议 & 隐私政策 */}
-      <Route path="/terms" element={<TermsPage />} />
-      <Route path="/privacy" element={<PrivacyPage />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/workspace" replace />} />

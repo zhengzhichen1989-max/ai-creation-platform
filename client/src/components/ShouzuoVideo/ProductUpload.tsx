@@ -1,21 +1,18 @@
-import { useState, useCallback } from 'react';
+import { useRef, useState, type DragEvent, type ChangeEvent } from 'react';
 import {
   Box,
   Typography,
-  Button,
-  Paper,
-  IconButton,
+  CircularProgress,
+  Alert,
+  Stack,
+  Chip,
 } from '@mui/material';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AddIcon from '@mui/icons-material/Add';
 
 interface ProductUploadProps {
   files: File[];
   onFilesChange: (files: File[]) => void;
-  onStartAnalysis: () => void;
+  onStartAnalysis: () => Promise<void>;
   disabled?: boolean;
-  maxFiles?: number;
 }
 
 export default function ProductUpload({
@@ -23,179 +20,141 @@ export default function ProductUpload({
   onFilesChange,
   onStartAnalysis,
   disabled = false,
-  maxFiles = 5,
 }: ProductUploadProps) {
-  const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragOver(false);
-      const dropped = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith('image/'));
-      const combined = [...files, ...dropped].slice(0, maxFiles);
-      onFilesChange(combined);
-    },
-    [files, maxFiles, onFilesChange],
-  );
+  const handleFiles = (fileList: FileList) => {
+    const newFiles = Array.from(fileList).filter((f) =>
+      f.type.startsWith('image/')
+    );
+    onFilesChange([...files, ...newFiles]);
+  };
 
-  const handleFileInput = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const selected = Array.from(e.target.files ?? []);
-      const combined = [...files, ...selected].slice(0, maxFiles);
-      onFilesChange(combined);
-    },
-    [files, maxFiles, onFilesChange],
-  );
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files);
+    }
+  };
 
-  const removeFile = useCallback(
-    (index: number) => {
-      onFilesChange(files.filter((_, i) => i !== index));
-    },
-    [files, onFilesChange],
-  );
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
 
-  const previews = files.map((f) => URL.createObjectURL(f));
+  const handleDragLeave = () => setIsDragOver(false);
+
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFiles(e.target.files);
+    }
+  };
+
+  const handleRemove = (index: number) => {
+    const newFiles = [...files];
+    newFiles.splice(index, 1);
+    onFilesChange(newFiles);
+  };
+
+  const handleAnalyze = async () => {
+    if (files.length === 0) return;
+    setUploading(true);
+    try {
+      await onStartAnalysis();
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <Box>
-      <Typography variant="h6" sx={{ mb: 1 }}>
-        Step 1: 上传产品图
+      <Typography variant="h6" gutterBottom>
+        上传产品图片
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        上传 1-{maxFiles} 张产品图（支持多角度），JPG/PNG 格式
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+        上传服装/产品图片，AI 将自动识别风格特征并推荐合适的视频风格模板
       </Typography>
+      <Alert severity="info" sx={{ mb: 3 }}>
+        建议上传模特穿着的图片，分镜效果更佳。如只有平铺图，系统将自动生成穿着效果图（消耗3积分）。
+      </Alert>
 
       {/* 上传区域 */}
-      <Paper
-        variant="outlined"
+      <Box
         onDrop={handleDrop}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onClick={() => inputRef.current?.click()}
         sx={{
+          border: '2px dashed',
+          borderColor: isDragOver ? 'primary.main' : 'divider',
+          borderRadius: 2,
           p: 4,
-          mb: 2,
           textAlign: 'center',
-          borderStyle: 'dashed',
-          borderColor: dragOver ? 'primary.main' : 'divider',
-          bgcolor: dragOver ? 'action.hover' : 'background.paper',
           cursor: 'pointer',
+          bgcolor: isDragOver ? 'action.hover' : 'transparent',
           transition: 'all 0.2s',
+          mb: 3,
         }}
-        onClick={() => document.getElementById('shouzuo-file-input')?.click()}
       >
         <input
-          id="shouzuo-file-input"
+          ref={inputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
           multiple
-          hidden
-          onChange={handleFileInput}
+          accept="image/*"
+          onChange={handleInputChange}
+          style={{ display: 'none' }}
         />
-        <CloudUploadIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-        <Typography variant="body1" color="text.secondary">
-          拖拽图片到此处，或点击上传
+        <Typography sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }}>📁</Typography>
+        <Typography variant="body1">
+          拖拽图片到此处，或 <Box component="span" color="primary.main">点击上传</Box>
         </Typography>
         <Typography variant="caption" color="text.disabled">
-          支持 JPG / PNG / WebP（建议 1000x1000 以上）
+          支持 JPG/PNG/WEBP，最多 10 张
         </Typography>
-      </Paper>
+      </Box>
 
-      {/* 已上传预览 */}
-      {previews.length > 0 && (
-        <>
-          <Box
-            sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 1.5,
-              mb: 2,
-            }}
-          >
-            {previews.map((url, i) => (
-              <Box
-                key={i}
-                sx={{
-                  position: 'relative',
-                  width: 140,
-                  height: 140,
-                  flexShrink: 0,
-                  borderRadius: 1.5,
-                  overflow: 'hidden',
-                  bgcolor: 'grey.100',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                }}
-              >
-                <img
-                  src={url}
-                  alt={`产品图 ${i + 1}`}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'contain',
-                    display: 'block',
-                  }}
-                />
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeFile(i);
-                  }}
-                  sx={{
-                    position: 'absolute',
-                    top: 4,
-                    right: 4,
-                    bgcolor: 'rgba(0,0,0,0.5)',
-                    color: '#fff',
-                    '&:hover': { bgcolor: 'rgba(255,0,0,0.7)' },
-                    width: 24,
-                    height: 24,
-                  }}
-                >
-                  <DeleteIcon sx={{ fontSize: 14 }} />
-                </IconButton>
-              </Box>
-            ))}
-            {files.length < maxFiles && (
-              <Box
-                sx={{
-                  width: 140,
-                  height: 140,
-                  flexShrink: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: 1.5,
-                  border: '2px dashed',
-                  borderColor: 'divider',
-                  cursor: 'pointer',
-                  bgcolor: 'background.paper',
-                  '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
-                }}
-                onClick={() => document.getElementById('shouzuo-file-input')?.click()}
-              >
-                <AddIcon sx={{ color: 'text.disabled' }} />
-              </Box>
-            )}
-          </Box>
-        </>
+      {/* 已上传文件列表 */}
+      {files.length > 0 && (
+        <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 3 }}>
+          {files.map((file, index) => (
+            <Chip
+              key={index}
+              label={file.name}
+              onDelete={() => handleRemove(index)}
+              sx={{ m: 0.5 }}
+            />
+          ))}
+        </Stack>
       )}
 
       {/* 开始分析按钮 */}
-      <Button
-        variant="contained"
-        size="large"
-        fullWidth
-        disabled={files.length === 0 || disabled}
-        onClick={onStartAnalysis}
-        sx={{ mt: 2, py: 1.5 }}
+      <button
+        type="button"
+        onClick={handleAnalyze}
+        disabled={files.length === 0 || disabled || uploading}
+        style={{
+          background: (files.length === 0 || disabled || uploading) ? '#ccc' : '#7c3aed',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 20,
+          padding: '12px 28px',
+          fontSize: '15px',
+          fontWeight: 600,
+          cursor: (files.length === 0 || disabled || uploading) ? 'not-allowed' : 'pointer',
+          opacity: (files.length === 0 || disabled || uploading) ? 0.6 : 1,
+          position: 'relative',
+          zIndex: 10,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}
       >
-        {files.length === 0 ? '请先上传产品图' : `开始分析 (${files.length} 张)`}
-      </Button>
+        {uploading && <CircularProgress size={18} sx={{ color: '#fff' }} />}
+        {uploading ? 'AI 识别中...' : '✨ 开始 AI 识别 + 风格推荐'}
+      </button>
     </Box>
   );
 }
