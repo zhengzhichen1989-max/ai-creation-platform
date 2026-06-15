@@ -880,7 +880,6 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
         "UPDATE shouzuo_sessions SET current_step = 'video', updated_at = ? WHERE id = ?",
         [new Date().toISOString(), body.sessionId]
       );
-      shouzuoService.saveDatabase();
     }
 
     if (body.model === "seedance-2.0") {
@@ -925,6 +924,14 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
         }));
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
+
+        // 退还已扣除的视频生成积分
+        try {
+          creditsService.refund(userId, videoCost, `种草视频-视频生成失败退回(session:${body.sessionId})`);
+          console.log(`[shouzuo] 已退还 ${videoCost} 积分 (userId=${userId})`);
+        } catch (refundErr) {
+          console.error('[shouzuo] 视频生成失败退款异常:', refundErr);
+        }
 
         // 针对常见API错误返回更友好的提示
         if (errMsg.includes('PrivacyInformation') || errMsg.includes('real person')) {
@@ -974,6 +981,14 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
         } catch (err: unknown) {
           const errMsg = err instanceof Error ? err.message : String(err);
 
+          // 退还已扣除的视频生成积分
+          try {
+            creditsService.refund(userId, videoCost, `种草视频-Kling段${i+1}生成失败退回(session:${body.sessionId})`);
+            console.log(`[shouzuo] 已退还 ${videoCost} 积分 (userId=${userId})`);
+          } catch (refundErr) {
+            console.error('[shouzuo] 视频生成退款异常:', refundErr);
+          }
+
           if (errMsg.includes('PrivacyInformation') || errMsg.includes('real person')) {
             return reply.status(400).send({
               code: 'REAL_PERSON_DETECTED',
@@ -991,7 +1006,6 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
         "UPDATE shouzuo_sessions SET video_segment_ids = ?, video_status = ?, updated_at = ? WHERE id = ?",
         [JSON.stringify(segments), "processing", new Date().toISOString(), body.sessionId]
       );
-      shouzuoService.saveDatabase();
 
       return reply.send(successResponse({
         taskId: segmentIds[0],
