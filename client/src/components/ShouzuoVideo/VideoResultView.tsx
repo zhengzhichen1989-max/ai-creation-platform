@@ -9,9 +9,10 @@ interface VideoResultViewProps {
   isGenerating: boolean;
   isPolling: boolean;
   onDownload?: () => void;
+  onRetry?: () => void;
 }
 
-export default function VideoResultView({ result, isGenerating, isPolling, onDownload }: VideoResultViewProps) {
+export default function VideoResultView({ result, isGenerating, isPolling, onDownload, onRetry }: VideoResultViewProps) {
   // 初始加载
   if ((isGenerating || isPolling) && !result) {
     return (
@@ -77,6 +78,25 @@ export default function VideoResultView({ result, isGenerating, isPolling, onDow
         <Typography variant="body2" color="text.secondary">
           {result.errorMessage || '请稍后重试'}
         </Typography>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            style={{
+              background: '#7c3aed',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 20,
+              padding: '10px 24px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginTop: '16px',
+            }}
+          >
+            重新生成视频
+          </button>
+        )}
       </Box>
     );
   }

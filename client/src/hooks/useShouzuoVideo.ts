@@ -351,6 +351,8 @@ export function useShouzuoVideo() {
             pollErrorCount++;
             if (pollErrorCount >= 10) {
               stopPolling();
+              setVideoGenerating(false);
+              setVideoResult(prev => prev ? { ...prev, status: 'failed', errorMessage: '轮询中断，请点击重新生成' } : null);
               setError('轮询中断，请刷新页面后重试');
             }
           }
@@ -362,6 +364,7 @@ export function useShouzuoVideo() {
       const msg = err instanceof Error ? err.message : '视频生成失败';
       setError(msg);
       setVideoGenerating(false);
+      setStep('storyboard');  // 回退到故事板步骤，让用户可以重试
     }
   }, [setError, setStep, setVideoResult, setVideoGenerating, setVideoPolling, stopPolling]);
 
@@ -431,11 +434,13 @@ export function useShouzuoVideo() {
         pollErrorCount++;
         if (pollErrorCount >= 10) {
           stopPolling();
+          setVideoGenerating(false);
+          setVideoResult(prev => prev ? { ...prev, status: 'failed', errorMessage: '轮询中断，请点击重新生成' } : null);
           setError('轮询中断，请刷新页面后重试');
         }
       }
     }, 3000);
-  }, [setError, setStep, setVideoResult, setVideoPolling, stopPolling]);
+  }, [setError, setStep, setVideoResult, setVideoGenerating, setVideoPolling, stopPolling]);
 
   // ============================================================
   // 恢复会话（刷新页面后从 API 恢复 store 状态）
@@ -504,9 +509,13 @@ export function useShouzuoVideo() {
 
       // 设定步骤（安全校验：确保是合法的步骤值）
       const validSteps: Array<string> = ['upload', 'ai_recognize', 'video_params', 'storyboard', 'video', 'copywriting'];
-      const restoredStep = sessionData.currentStep && validSteps.includes(sessionData.currentStep)
+      let restoredStep = sessionData.currentStep && validSteps.includes(sessionData.currentStep)
         ? sessionData.currentStep
         : 'upload';
+      // 前端防御：如果视频结果存在且处于视频相关状态，强制设为 'video' 步骤
+      if (sessionData.videoResult && ['processing', 'pending', 'completed', 'failed'].includes(sessionData.videoResult.status)) {
+        restoredStep = 'video';
+      }
       setStep(restoredStep as any);
 
       // 存 localStorage

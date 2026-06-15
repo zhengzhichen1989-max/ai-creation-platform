@@ -486,6 +486,7 @@ export default function ShouzuoVideoPage() {
             isGenerating={isVideoGenerating}
             isPolling={isVideoPolling}
             onDownload={handleDownloadVideo}
+            onRetry={generateVideo}
           />
         );
 

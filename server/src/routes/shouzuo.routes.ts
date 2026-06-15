@@ -520,13 +520,14 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
       selectedStyle,
       videoParams,
       storyboard,
-      videoResult: session.video_url ? {
-        taskId: session.video_status === "processing" ? "" : "",
-        videoUrl: session.video_url,
-        thumbnailUrl: session.video_url,
-        status: session.video_status ?? "pending",
+      videoResult: session.video_status && ['processing','pending','completed','failed'].includes(session.video_status) ? {
+        taskId: session.video_status === "processing" ? (session.video_segments_json ? JSON.parse(session.video_segments_json)[0]?.task_id || "" : "") : "",
+        videoUrl: session.video_url || null,
+        thumbnailUrl: session.video_url || null,
+        status: session.video_status,
         duration: videoParams?.duration ?? 10,
-        progress: session.video_status === "completed" ? 100 : 10,
+        progress: session.video_status === "completed" ? 100 : session.video_status === "failed" ? 0 : 10,
+        errorMessage: session.video_error || undefined,
       } : null,
       copywritingItems: copywriting ? [copywriting] : [],
       preDeductedCredits: session.pre_deducted_credits,
@@ -871,6 +872,16 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
 
     // 标记 processing
     shouzuoService.saveVideoTask(body.sessionId, userId, "pending");
+
+    // 更新 current_step 为 'video'，确保刷新页面后能恢复到视频步骤
+    {
+      const db = getDb();
+      db.run(
+        "UPDATE shouzuo_sessions SET current_step = 'video', updated_at = ? WHERE id = ?",
+        [new Date().toISOString(), body.sessionId]
+      );
+      shouzuoService.saveDatabase();
+    }
 
     if (body.model === "seedance-2.0") {
       // Seedance：单段模式，所有帧一起传入
