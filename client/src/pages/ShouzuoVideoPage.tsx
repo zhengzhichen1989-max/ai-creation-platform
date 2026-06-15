@@ -9,12 +9,26 @@ import {
   Chip,
   Card,
   CardContent,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  ListItemButton,
+  IconButton,
+  Button,
 } from '@mui/material';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import HistoryIcon from '@mui/icons-material/History';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import CloseIcon from '@mui/icons-material/Close';
 import { useNavigate } from 'react-router-dom';
 import { useShouzuoVideo } from '@/hooks/useShouzuoVideo';
 import { useShouzuoVideoStore } from '@/stores/shouzuoVideo.store';
+import * as shouzuoApi from '@/api/shouzuoVideo';
 import ProductUpload from '@/components/ShouzuoVideo/ProductUpload';
 import PreprocessingPreview from '@/components/ShouzuoVideo/PreprocessingPreview';
 import VideoParamsForm from '@/components/ShouzuoVideo/VideoParamsForm';
@@ -22,7 +36,7 @@ import StoryboardView from '@/components/ShouzuoVideo/StoryboardView';
 import VideoResultView from '@/components/ShouzuoVideo/VideoResultView';
 import CopywritingResultView from '@/components/ShouzuoVideo/CopywritingResultView';
 import { Stepper, Step, StepLabel } from '@mui/material';
-import type { VideoParams } from '@/types/shouzuo';
+import type { VideoParams, ShouzuoStep } from '@/types/shouzuo';
 
 // 6步工作流步骤定义
 const STEPS = [
@@ -37,9 +51,18 @@ const STEPS = [
 export default function ShouzuoVideoPage() {
   const navigate = useNavigate();
   const [localError, setLocalError] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [sessionHistoryOpen, setSessionHistoryOpen] = useState(false);
+  const [sessionHistory, setSessionHistory] = useState<Array<{
+    sessionId: string;
+    currentStep: ShouzuoStep;
+    uploadedImages: string[];
+    selectedStyle: any;
+    createdAt: string;
+  }>>([]);
 
   // 从 store 读取步骤状态
-  const { currentStep, uploadedFiles, uploadedUrls, setUploadedFiles, aiRecognition, styleTemplates, selectedStyle, setSelectedStyle } = useShouzuoVideoStore();
+  const { currentStep, session, uploadedFiles, uploadedUrls, setUploadedFiles, aiRecognition, styleTemplates, selectedStyle, setSelectedStyle } = useShouzuoVideoStore();
 
   const {
     isAnalyzing,
@@ -47,6 +70,7 @@ export default function ShouzuoVideoPage() {
     preprocessedImageUrl,
     preprocessingStatus,
     isStoryboardGenerating,
+    changingAngleIndex,
     isVideoGenerating,
     isVideoPolling,
     isCopywritingGenerating,
@@ -61,18 +85,35 @@ export default function ShouzuoVideoPage() {
     skipPreprocessing,
     confirmVideoParams,
     generateStoryboard,
+    regenerateSingleFrame,
     generateVideo,
     generateCopywriting,
+    restoreSession,
     getSelectedCopywriting,
     getVideoUrl,
     stopPolling,
-    reset,
   } = useShouzuoVideo();
 
   // 页面加载时获取风格模板
   useEffect(() => {
     fetchStyleTemplates();
   }, [fetchStyleTemplates]);
+
+  // 页面加载时自动恢复会话（从 localStorage）
+  useEffect(() => {
+    const savedSessionId = localStorage.getItem('shouzuo_active_session');
+    // 直接从 store 读取，避免闭包陈旧值
+    const currentSession = useShouzuoVideoStore.getState().session;
+    if (savedSessionId && !currentSession) {
+      setIsRestoring(true);
+      restoreSession(savedSessionId)
+        .catch(() => {
+          // 恢复失败就清除 localStorage，留在 upload 步骤
+          localStorage.removeItem('shouzuo_active_session');
+        })
+        .finally(() => setIsRestoring(false));
+    }
+  }, []); // eslint-disable-line
 
   // 错误处理
   useEffect(() => {
@@ -81,11 +122,10 @@ export default function ShouzuoVideoPage() {
     }
   }, [hookError]);
 
-  // 组件卸载时清理
+  // 组件卸载时只停止轮询，不清除 store 和 localStorage（保留恢复能力）
   useEffect(() => {
     return () => {
       stopPolling();
-      reset();
     };
   }, []); // eslint-disable-line
 
@@ -151,11 +191,66 @@ export default function ShouzuoVideoPage() {
     handleDownloadCopywriting();
   }, [handleDownloadVideo, handleDownloadCopywriting]);
 
+  // 打开历史会话列表
+  const handleOpenHistory = useCallback(async () => {
+    try {
+      const result = await shouzuoApi.getSessionHistory({ page: 1, limit: 20 });
+      setSessionHistory(result.items);
+      setSessionHistoryOpen(true);
+    } catch {
+      setLocalError('获取历史会话失败');
+    }
+  }, []);
+
+  // 从历史会话恢复
+  const handleRestoreSession = useCallback(async (sessionId: string) => {
+    setSessionHistoryOpen(false);
+    setIsRestoring(true);
+    try {
+      await restoreSession(sessionId);
+    } catch {
+      setLocalError('恢复会话失败');
+    } finally {
+      setIsRestoring(false);
+    }
+  }, [restoreSession]);
+
+  // 放弃当前会话，重新开始
+  const handleAbandonSession = useCallback(() => {
+    localStorage.removeItem('shouzuo_active_session');
+    useShouzuoVideoStore.getState().reset();
+  }, []);
+
+  // 步骤名称映射
+  const stepLabelMap: Record<string, string> = {
+    upload: '上传产品图',
+    ai_recognize: 'AI识别',
+    video_params: '视频参数',
+    storyboard: '故事板',
+    video: '生成视频',
+    copywriting: 'AI文案',
+  };
+
   // 获取当前步骤索引
   const activeIndex = STEPS.findIndex((s) => s.id === currentStep);
 
   // 渲染当前步骤内容
   const renderStepContent = () => {
+    // 正在恢复会话
+    if (isRestoring) {
+      return (
+        <Box sx={{ textAlign: 'center', py: 8 }}>
+          <CircularProgress size={48} />
+          <Typography variant="h6" sx={{ mt: 2 }}>
+            正在恢复会话...
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            正在加载上次的工作进度
+          </Typography>
+        </Box>
+      );
+    }
+
     // AI 识别中
     if (isAnalyzing) {
       return (
@@ -326,14 +421,13 @@ export default function ShouzuoVideoPage() {
                   preprocessedImageUrl={preprocessedImageUrl}
                   preprocessingStatus={preprocessingStatus}
                   onPreprocess={preprocessImage}
-                  onSkip={skipPreprocessing}
                   onConfirm={() => useShouzuoVideoStore.getState().setStep('video_params')}
                   error={hookError}
                 />
               </Box>
             )}
 
-            {/* 下一步按钮（非平铺图时直接显示，平铺图时需先完成预处理或跳过） */}
+            {/* 下一步按钮（仅非平铺图时显示，平铺图必须先完成预处理） */}
             {!needsPreprocessing && (
               <Box sx={{ textAlign: 'center', mt: 2 }}>
                 <button
@@ -380,6 +474,8 @@ export default function ShouzuoVideoPage() {
             onGenerate={() => generateStoryboard(4)}
             onConfirm={generateVideo}
             onRegenerate={(count, frameIndex) => generateStoryboard(count || 4, frameIndex)}
+            onChangeAngle={regenerateSingleFrame}
+            changingAngleIndex={changingAngleIndex}
           />
         );
 
@@ -451,10 +547,17 @@ export default function ShouzuoVideoPage() {
         );
 
       default:
+        // 安全兜底：未知步骤回退到上传页面
         return (
-          <Box sx={{ py: 4, textAlign: 'center' }}>
-            <Typography color="text.secondary">加载中...</Typography>
-          </Box>
+          <ProductUpload
+            files={uploadedFiles}
+            onFilesChange={setUploadedFiles}
+            onStartAnalysis={async () => {
+              if (uploadedFiles.length === 0) return;
+              await handleStartAnalysis(uploadedFiles);
+            }}
+            disabled={isAnalyzing}
+          />
         );
     }
   };
@@ -489,6 +592,57 @@ export default function ShouzuoVideoPage() {
         上传产品图 → AI识别风格 → 确认参数 → 生成故事板 → 生成视频 → AI文案导出
       </Typography>
 
+      {/* 恢复提示 + 历史会话按钮 */}
+      {session && currentStep !== 'upload' && (
+        <Alert severity="info" sx={{ mb: 2 }} icon={<RefreshIcon />} action={
+          <button
+            type="button"
+            onClick={handleAbandonSession}
+            style={{
+              background: 'transparent',
+              border: '1px solid #e0e0e0',
+              borderRadius: '4px',
+              color: '#666',
+              cursor: 'pointer',
+              fontSize: '12px',
+              padding: '2px 8px',
+            }}
+          >
+            放弃，重新开始
+          </button>
+        }>
+          已恢复上次的会话进度（步骤：{stepLabelMap[currentStep] || currentStep}）
+          <button
+            type="button"
+            onClick={handleOpenHistory}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#1565c0',
+              cursor: 'pointer',
+              fontSize: '13px',
+              marginLeft: '8px',
+              padding: 0,
+              textDecoration: 'underline',
+            }}
+          >
+            查看历史会话
+          </button>
+        </Alert>
+      )}
+      {(!session || currentStep === 'upload') && (
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button
+            size="small"
+            startIcon={<HistoryIcon />}
+            onClick={handleOpenHistory}
+            sx={{ textTransform: 'none' }}
+          >
+            历史会话
+          </Button>
+        </Box>
+      )}
+
       {(localError) && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLocalError(null)}>
           {localError}
@@ -512,6 +666,60 @@ export default function ShouzuoVideoPage() {
       <Box sx={{ position: 'relative' }}>
         {renderStepContent()}
       </Box>
+
+      {/* 历史会话 Dialog */}
+      <Dialog open={sessionHistoryOpen} onClose={() => setSessionHistoryOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="h6">历史会话</Typography>
+          <IconButton onClick={() => setSessionHistoryOpen(false)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          {sessionHistory.length === 0 ? (
+            <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
+              暂无历史会话
+            </Typography>
+          ) : (
+            <List disablePadding>
+              {sessionHistory.map((s) => (
+                <ListItem key={s.sessionId} disablePadding divider>
+                  <ListItemButton onClick={() => handleRestoreSession(s.sessionId)}>
+                    <ListItemAvatar>
+                      <img
+                        src={s.uploadedImages?.[0] || '/placeholder.png'}
+                        alt="产品图"
+                        style={{
+                          width: 48, height: 48, objectFit: 'cover', borderRadius: 8,
+                          border: '1px solid #e0e0e0',
+                        }}
+                        onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.png'; }}
+                      />
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="body2" fontWeight="medium">
+                            {s.selectedStyle ? `${s.selectedStyle.emoji} ${s.selectedStyle.name}` : '未选风格'}
+                          </Typography>
+                          <Chip
+                            label={stepLabelMap[s.currentStep] || s.currentStep}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            sx={{ fontSize: '11px', height: 20 }}
+                          />
+                        </Box>
+                      }
+                      secondary={new Date(s.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }

@@ -328,13 +328,8 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ message: "会话不存在" });
     }
 
-    // 检查是否需要预处理
-    let aiRecognition: Record<string, unknown> = {};
-    try { if (session.ai_recognition_json) aiRecognition = JSON.parse(session.ai_recognition_json); } catch (_) { /* ignore */ }
-    const needsPreprocessing = aiRecognition["needs_preprocessing"] === true;
-    if (!needsPreprocessing) {
-      return reply.status(400).send({ message: "该会话无需预处理（图片类型为穿着图）" });
-    }
+    // 注意：不在此处校验 needs_preprocessing，因为 analyze 结果未持久化到 DB
+    // 前端已根据 analyze 返回值控制了预处理按钮的显示，直接信任客户端意图即可
 
     // 积分扣减：3 积分
     try {
@@ -367,7 +362,7 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
       // 调用 GPT-Image-2 edits API 生成穿着效果图
       const result = await gptImageService.editImage(
         fullProductImageUrl,
-        "Generate a full-body photo of someone wearing this exact garment, standing in a natural relaxed pose, neutral light gray background, soft even studio lighting, the garment is the clear focus with all details visible, face naturally turned away from camera or partially hidden by hair."
+        "Generate a full-body photo of a model wearing this exact garment, standing in a natural relaxed pose, neutral light gray background, soft even studio lighting, the garment is the clear focus with all details visible, model in a half-profile pose with face naturally turned slightly away from camera, no hair or accessories covering the face, professional fashion photography style."
       );
 
       if (result.success && result.resultUrl) {
@@ -535,6 +530,8 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
       } : null,
       copywritingItems: copywriting ? [copywriting] : [],
       preDeductedCredits: session.pre_deducted_credits,
+      preprocessed_image_url: session.preprocessed_image_url || undefined,
+      preprocessing_status: session.preprocessing_status || undefined,
       createdAt: session.created_at,
     }));
   });
@@ -684,7 +681,6 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
         : `${config.publicBaseUrl}${preUrl}`;
     }
 
-    // 并发生成所有帧
     const frames: shouzuoService.StoryboardFrame[] = [];
     const concurrency = 3;
     const maxRetries = 1;
@@ -760,13 +756,94 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
     }));
   });
 
-  /** 重新生成故事板 */
+  /** 重新生成故事板（全部） */
   app.post("/storyboard/regenerate", { preHandler: [authMiddleware, contentModerationMiddleware] }, async (request, reply) => {
-    // 复用 generate 逻辑，但加入 feedback
-    const body = regenerateStoryboardSchema.parse(request.body);
-    // ... 类似 generate 的逻辑，但 prompt 中加入 body.feedback
-    // 为节省篇幅，这里简化为调用通用逻辑（实际实现需完整）
-    return reply.status(501).send({ message: "重新生成暂未实现，请重新生成整个故事板" });
+    return reply.status(501).send({ message: "请使用全部重新生成按钮" });
+  });
+
+  /** 换角度重新生成单帧分镜 */
+  app.post("/storyboard/change-angle", { preHandler: [authMiddleware, contentModerationMiddleware] }, async (request, reply) => {
+    const body = z.object({
+      sessionId: z.string().min(1),
+      frameIndex: z.number().int().min(0),   // 0-based index in frames array
+    }).parse(request.body);
+
+    const userId = request.userId!;
+    const session = shouzuoService.getSession(body.sessionId, userId);
+    if (!session) {
+      return reply.status(404).send({ message: "会话不存在" });
+    }
+
+    // 读取当前 storyboard
+    let frames: shouzuoService.StoryboardFrame[] = [];
+    try {
+      if (session.storyboard_json) {
+        const parsed = JSON.parse(session.storyboard_json);
+        frames = parsed.frames || parsed || [];
+      }
+    } catch (_) { /* ignore */ }
+
+    if (body.frameIndex >= frames.length) {
+      return reply.status(400).send({ message: "帧索引超出范围" });
+    }
+
+    const frame = frames[body.frameIndex];
+    const seq = frame.seq;
+    const styleId = session.selected_style_id;
+    const clothingInfo = session.ai_recognition_json
+      ? JSON.parse(session.ai_recognition_json)
+      : {};
+
+    // 构建新 prompt
+    const promptResult = shouzuoService.buildStoryboardPrompt(styleId, seq, clothingInfo);
+    if (!promptResult) {
+      return reply.status(400).send({ message: "无法构建分镜提示词" });
+    }
+
+    // 确定编辑源（预处理图优先）
+    const editSourceUrl = session.preprocessed_image_url || frame.imageUrl;
+    if (!editSourceUrl) {
+      return reply.status(400).send({ message: "无编辑源图片" });
+    }
+
+    // 扣积分
+    try {
+      creditsService.deduct(userId, 3, `重新生成分镜帧${seq}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "积分不足";
+      return reply.status(402).send({ message: msg });
+    }
+
+    // 调用 GPT-Image-2 生成
+    try {
+      const result = await gptImageService.editImage(editSourceUrl, promptResult.prompt);
+      if (result.success && result.resultUrl) {
+        // 更新帧数据
+        frames[body.frameIndex] = {
+          ...frame,
+          prompt: promptResult.prompt,
+          imageUrl: result.resultUrl,
+          status: "completed",
+          retry_count: (frame.retry_count || 0) + 1,
+        };
+
+        // 保存回数据库
+        shouzuoService.updateSessionStoryboard(body.sessionId, JSON.stringify({ frames }));
+
+        return reply.send(successResponse({
+          frame: frames[body.frameIndex],
+        }));
+      }
+
+      // 生成失败，退回积分
+      creditsService.refund(userId, 3, `重新生成分镜帧${seq}失败退回`);
+      return reply.status(500).send({ message: result.errorMessage || "图片生成失败，积分已退回" });
+    } catch (err: unknown) {
+      // 异常也退回积分
+      creditsService.refund(userId, 3, `重新生成分镜帧${seq}异常退回`);
+      const msg = err instanceof Error ? err.message : "生成失败";
+      return reply.status(500).send({ message: `${msg}，积分已退回` });
+    }
   });
 
   // ============================================================

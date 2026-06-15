@@ -51,6 +51,7 @@ interface ShouzuoVideoState {
   // Step 4: 故事板
   storyboard: Storyboard | null;
   isStoryboardGenerating: boolean;
+  changingAngleIndex: number | null;  // 正在重新生成的帧索引
 
   // Step 5: 视频
   videoResult: ShouzuoVideoResult | null;
@@ -88,6 +89,7 @@ interface ShouzuoVideoState {
   // Step 4
   setStoryboard: (storyboard: Storyboard | null) => void;
   setStoryboardGenerating: (v: boolean) => void;
+  setChangingAngleIndex: (v: number | null) => void;
 
   // Step 5
   setVideoResult: (result: ShouzuoVideoResult | null) => void;
@@ -131,6 +133,7 @@ const initialState = {
   // Step 4
   storyboard: null,
   isStoryboardGenerating: false,
+  changingAngleIndex: null,
 
   // Step 5
   videoResult: null,
@@ -174,6 +177,7 @@ export const useShouzuoVideoStore = create<ShouzuoVideoState>((set, get) => ({
   // Step 4
   setStoryboard: (storyboard) => set({ storyboard }),
   setStoryboardGenerating: (v) => set({ isStoryboardGenerating: v }),
+  setChangingAngleIndex: (v) => set({ changingAngleIndex: v }),
 
   // Step 5
   setVideoResult: (result) => set({ videoResult: result }),
@@ -186,7 +190,8 @@ export const useShouzuoVideoStore = create<ShouzuoVideoState>((set, get) => ({
   setCopywritingGenerating: (v) => set({ isCopywritingGenerating: v }),
 
   setError: (error) => set({ error }),
-  reset: () => set(initialState),
-}));
+  reset: () => {
+    set(initialState);
+  },}));
 
 export default useShouzuoVideoStore;

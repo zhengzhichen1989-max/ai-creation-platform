@@ -151,36 +151,36 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
     fallback_model: "kling-v3",
     default_resolution: "720p",
     default_storyboard_count: 4,
-    cost_hint: "分镜图12积分 + 视频约45-85积分（视时长分辨率）",
+    cost_hint: "分镜图12积分 + 视频按秒计费（Seedance 9积分/秒，Kling每段3.6积分/秒）",
     storyboards: [
       {
-        seq: 1, name: "全身展示", purpose: "视频开头，缓慢推近镜头展示整体穿搭",
-        prompt: "Based on the product image, generate a full-body outfit showcase in Japanese mori style. The person stands on a grassy field or wooden deck bathed in soft morning side-light, wearing the garment with a relaxed, natural expression, not looking at the camera, hair and hem gently swaying in the breeze. Shallow depth of field, blurred background, warm green and off-white low-saturation color palette.",
-        prompt_cn: "基于产品图，生成日系森系风格服装全身展示图。人物站在自然光下的草地或木质露台，清晨柔和阳光从侧面打入，穿着该服装，表情松弛自然，不看镜头，微风吹动发丝和衣角。浅景深，背景虚化，色调偏暖绿+米白低饱和。"
+        seq: 1, name: "产品特写", purpose: "视频开头，聚焦产品本身",
+        prompt: "Based on the product image, generate a product close-up shot in Japanese mori style. The garment is placed on natural grass or a wooden deck, dappled sunlight filtering through leaves, NO human face or figure visible, focus entirely on the product silhouette, fabric texture, and color in natural light. Shallow depth of field, blurred green foliage background, warm green and off-white low-saturation color palette.",
+        prompt_cn: "基于产品图，生成日系森系风格产品特写图。服装放置在自然草地或木质露台上，阳光透过树叶形成斑驳光影，画面中无人脸或人物，完全聚焦产品轮廓、面料质感和自然光下的色彩。浅景深，背景模糊的绿色植物，低饱和暖绿+米白色调。"
       },
       {
-        seq: 2, name: "面料特写", purpose: "视频中间，展示材质细节",
-        prompt: "Based on the product image, generate a close-up detail shot of the fabric texture. Dappled sunlight filtering through leaves falls across the fabric surface, a hand gently grazing the material to reveal its weave and texture, with blurred green foliage in the background. Macro perspective, soft lighting, warm natural tones.",
-        prompt_cn: "基于产品图，生成服装面料细节特写图。阳光透过树叶在面料上形成斑驳光影，手部轻抚服装表面，展示面料纹理质感，背景模糊的绿色植物。微距视角，光线柔和，色调温暖自然。"
+        seq: 2, name: "背面穿搭", purpose: "展示服装在自然光下的整体轮廓",
+        prompt: "Based on the product image, generate a back-view outfit showcase in Japanese mori style. Person shown from behind or back three-quarter angle, face COMPLETELY INVISIBLE, no facial features visible, wearing the garment while walking slowly through a sunlit meadow or forest clearing. Displaying the full silhouette and drape of the garment in natural light, soft breeze gently swaying the hem. Shallow depth of field, warm green and off-white low-saturation tones.",
+        prompt_cn: "基于产品图，生成日系森系风格背面穿搭图。人物背影或背面3/4视角，面部完全不可见，穿着该服装在阳光草地或林间空地缓步前行。展示服装在自然光下的完整轮廓和垂坠感，微风吹动衣角。浅景深，低饱和暖绿+米白色调。"
       },
       {
-        seq: 3, name: "生活场景", purpose: "视频中间，建立生活化代入感",
-        prompt: "Based on the product image, generate a lifestyle scene of someone wearing the garment. The person sits naturally on a wooden bench or stone steps, holding a coffee cup or book, sunlight falling on their shoulders and the clothing, with a park or Japanese-style garden in the background. Medium shot, consistent low-saturation warm tones throughout.",
-        prompt_cn: "基于产品图，生成穿着该服装的生活化场景图。人物坐在木质长椅或台阶上，手捧咖啡或书本，自然坐姿，阳光洒在肩膀和服装上，背景是公园或日式庭院。中景构图，色调统一在低饱和暖调。"
+        seq: 3, name: "氛围侧影", purpose: "氛围镜头，轻微露脸",
+        prompt: "Based on the product image, generate an atmospheric side-profile shot in Japanese mori style. Person in side profile or looking downward, face NOT fully visible, loose wispy strands of hair naturally drifting across the cheeks and eyes in a soft breeze, partially veiling the face, NEVER facing the camera directly. Soft morning light falling on the shoulders, the garment flowing naturally. Warm green and off-white low-saturation tones, gentle and healing atmosphere.",
+        prompt_cn: "基于产品图，生成日系森系风格氛围侧影图。人物侧脸或低头，面部不完全可见，发丝自然飘动轻遮面颊和眼部，绝不正对镜头。柔和晨光洒在肩上，服装自然飘动。低饱和暖绿+米白色调，温柔治愈氛围。"
       },
       {
-        seq: 4, name: "背影侧影", purpose: "视频结尾，淡出收尾",
-        prompt: "Based on the product image, generate a back or side-profile view of the person. Walking slowly along a forest path or across an open meadow, or glancing back over their shoulder, the garment's full silhouette visible in natural light, hair drifting gently. Wide-angle composition with sky and trees as background, generous negative space, a sense of breathing room.",
-        prompt_cn: "基于产品图，生成人物背影或侧影图。在森林小径或草地中央，人物缓步前行或侧身回望，服装在自然光下呈现完整轮廓，发丝自然飘动。广角构图，天空和树木作为背景，留白多，呼吸感强。"
+        seq: 4, name: "结尾远影", purpose: "视频结尾，远景留白收尾",
+        prompt: "Based on the product image, generate a distant back-view ending shot in Japanese mori style. Person seen from far behind or as a side silhouette, face COMPLETELY INVISIBLE, walking away along a forest path or across an open meadow. Wide-angle composition with sky and trees as background, generous negative space, strong sense of breathing room. Low-saturation warm green and off-white tones, soft natural light.",
+        prompt_cn: "基于产品图，生成日系森系风格结尾远影图。人物远景背影或侧面剪影，面部完全不可见，沿森林小径或草地中央渐行渐远。广角构图，天空和树木作为背景，留白多，呼吸感强。低饱和暖绿+米白色调，柔和自然光。"
       },
     ],
     video_prompts: {
-      seedance: "Japanese mori-style fashion showcase, natural light, outdoor grassy or wooden setting, slow push-and-pull camera with subtle handheld breathing movement, low-saturation warm green and off-white tones, healing atmosphere, soft background blur, natural relaxed expression, gentle and airy feel",
-      seedance_cn: "日系森系服装展示，自然光，户外草地/木质场景，镜头缓慢推拉，轻微手持呼吸感，低饱和暖绿+米白色调，治愈氛围，背景虚化，人物表情自然松弛，画面柔和有呼吸感",
+      seedance: "Japanese mori-style fashion showcase, natural light, outdoor grassy or wooden setting, slow push-and-pull camera with subtle handheld breathing movement, low-saturation warm green and off-white tones, healing atmosphere, soft background blur, garment flowing gently in the breeze, gentle and airy feel",
+      seedance_cn: "日系森系服装展示，自然光，户外草地/木质场景，镜头缓慢推拉，轻微手持呼吸感，低饱和暖绿+米白色调，治愈氛围，背景虚化，服装在微风中轻柔飘动，画面柔和有呼吸感",
       kling_per_frame: [
-        { seq: 1, prompt: "Camera slowly pushes in from a distance with subtle handheld sway, creating an organic breathing feel", prompt_cn: "镜头从远处缓慢推近，保持手持微摇的呼吸感" },
-        { seq: 2, prompt: "Camera slowly pans across the fabric detail, maintaining macro focus", prompt_cn: "镜头缓慢横移扫过面料细节，保持微距焦点" },
-        { seq: 3, prompt: "Camera slowly pushes in from the side, holding a medium shot composition", prompt_cn: "镜头从侧面缓慢推近人物，保持中景构图" },
+        { seq: 1, prompt: "Camera slowly pushes in toward the product on grass, gentle dappled light, macro focus on fabric texture", prompt_cn: "镜头缓慢推近草地上的产品，斑驳光影，微距聚焦面料质感" },
+        { seq: 2, prompt: "Camera slowly tracks alongside the back-view figure, natural swaying movement", prompt_cn: "镜头缓慢跟随背影人物侧移，自然摇曳动态" },
+        { seq: 3, prompt: "Camera slowly orbits around the side-profile figure, hair and fabric swaying in breeze", prompt_cn: "镜头缓慢环绕侧影人物，发丝和面料随风飘动" },
         { seq: 4, prompt: "Camera slowly pulls back as the figure recedes, negative space increasing in the frame", prompt_cn: "镜头缓慢拉远，人物渐行渐远，画面留白增多" },
       ],
     },
@@ -200,48 +200,48 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
     fallback_model: "seedance-2.0",
     default_resolution: "1080p",
     default_storyboard_count: 6,
-    cost_hint: "分镜图18积分 + 视频约90-210积分（6段拼接，视时长分辨率）",
+    cost_hint: "分镜图18积分 + 视频按秒计费（Seedance 9积分/秒，Kling每段3.6积分/秒×6段）",
     storyboards: [
       {
-        seq: 1, name: "硬照特写", purpose: "视频开头，定调",
-        prompt: "Based on the product image, generate an upper-body close-up in street-style editorial look. Concrete wall or graffiti backdrop, hard side-lighting casting strong shadows, subject staring directly at the camera with a confident, fierce expression, wearing accessories, high-contrast lighting, saturated colors.",
-        prompt_cn: "基于产品图，生成潮流硬照风格的上半身特写。城市水泥墙或涂鸦背景，硬光从侧面打入，人物直视镜头，表情自信冷酷，佩戴配饰，高对比光影，色彩饱和度高。"
+        seq: 1, name: "产品特写", purpose: "视频开头，产品定调",
+        prompt: "Based on the product image, generate a product close-up shot in street-urban editorial style. The garment displayed against a concrete wall or graffiti backdrop, NO human face or figure visible, focus entirely on the product design details, bold graphic elements, and urban texture. Hard side-lighting casting strong shadows, high-contrast, saturated colors.",
+        prompt_cn: "基于产品图，生成潮流街头风格产品特写图。服装展示在城市水泥墙或涂鸦背景前，画面中无人脸或人物，完全聚焦产品设计细节、图案元素和都市质感。硬光侧面照射形成强阴影，高对比，色彩饱和。"
       },
       {
-        seq: 2, name: "全身街拍", purpose: "展示全身穿搭，广角冲击感",
-        prompt: "Based on the product image, generate a full-body street-style outfit shot. City street, overpass, or neon-lit scene, subject mid-stride with one foot forward, jacket fluttering in the wind, city lights blurring in the background. Low-angle shot with wide-angle perspective distortion for strong visual impact.",
-        prompt_cn: "基于产品图，生成街头全身穿搭图。城市街道或天桥或霓虹灯下，人物行走姿态动态感强，一脚迈出，外套随风微扬，背景是模糊的城市灯光。低角度仰拍，广角透视，强视觉冲击。"
+        seq: 2, name: "背面穿搭", purpose: "展示全身穿搭轮廓",
+        prompt: "Based on the product image, generate a back-view street-style outfit shot. Person shown from behind or back three-quarter angle, face COMPLETELY INVISIBLE, no facial features visible, wearing the garment in an urban street scene with cityscape background. Jacket hem and silhouette clearly visible, fabric texture under hard lighting. Low-angle perspective, city lights in background.",
+        prompt_cn: "基于产品图，生成街头背面穿搭图。人物背面3/4视角，面部完全不可见，穿着该服装在城市街景中，城市天际线背景。外套下摆和轮廓清晰可见，硬光下的面料质感。低角度透视，背景城市灯光。"
       },
       {
-        seq: 3, name: "细节特写", purpose: "快速闪切展示设计细节",
-        prompt: "Based on the product image, generate a close-up detail shot of the garment. Focus on prints, logos, zippers, or brim details, artificial studio lighting with metallic reflections, dark background to isolate the subject. Macro perspective, high sharpness.",
-        prompt_cn: "基于产品图，生成服装细节特写图。聚焦印花、logo、拉链、帽檐等设计细节，人工打光，金属质感反光，背景暗色突出主体。微距视角，锐度高。"
+        seq: 3, name: "侧面剪影", purpose: "展示穿搭轮廓与版型",
+        prompt: "Based on the product image, generate a side-silhouette street-style shot. Person shown in strict side profile, face COMPLETELY TURNED AWAY from the camera and INVISIBLE, displaying the full outfit silhouette and cut. City street or overpass background, hard rim lighting creating strong outline contrast, garment structure clearly visible. Medium shot composition.",
+        prompt_cn: "基于产品图，生成街头侧面剪影图。人物严格侧面，面部完全转离镜头不可见，展示完整穿搭轮廓和版型。城市街道或天桥背景，硬质轮廓光形成强烈边缘对比，服装结构清晰。中景构图。"
       },
       {
-        seq: 4, name: "动态姿态", purpose: "增强动感，展示服装动态表现",
-        prompt: "Based on the product image, generate a dynamic pose shot. Jumping, turning, leaning against a wall, or crouching — classic street poses — with a vivid expression, hair slightly disheveled from movement, fabric creasing naturally with body motion. High-speed shutter freezing the instant, city background blurred.",
-        prompt_cn: "基于产品图，生成人物动态姿态图。跳跃、转身、靠墙或蹲坐等街头常见姿态，表情生动，发型因动态微乱，服装随身体扭曲产生褶皱。高速快门凝固瞬间，背景城市模糊。"
+        seq: 4, name: "氛围侧影", purpose: "氛围镜头，轻微露脸",
+        prompt: "Based on the product image, generate an atmospheric side-profile shot in street-urban style. Person in side profile or looking downward, face NOT fully visible, loose messy hair naturally drifting across the cheeks and eyes in the urban wind, partially veiling the face, NEVER facing the camera directly. Neon lights or hard lighting scene, rim light on the garment, raw edgy urban atmosphere. High-contrast, saturated colors.",
+        prompt_cn: "基于产品图，生成潮流街头氛围侧影图。人物侧脸或低头，面部不完全可见，凌乱发丝在城市风中自然飘动半遮面颊和眼部，绝不正对镜头。霓虹灯或硬光场景，服装轮廓光，粗犷都市氛围。高对比，色彩饱和。"
       },
       {
-        seq: 5, name: "夜景霓虹", purpose: "色彩对比高潮段",
-        prompt: "Based on the product image, generate a night scene outfit shot under neon lights. Colorful neon glow from behind or the side creating a strong rim light on the subject, neon color reflections on shadowed areas of the face, predominantly cool tones. Blurred night market or street lights in the background.",
-        prompt_cn: "基于产品图，生成夜景霓虹灯下的穿搭图。彩色霓虹灯光从背后或侧面照射，人物轮廓光明显，面部阴影处有霓虹色彩反射，冷色调为主。背景是模糊的夜市或街道灯光。"
+        seq: 5, name: "细节特写", purpose: "快速闪切展示设计细节",
+        prompt: "Based on the product image, generate a close-up detail shot of the garment. Focus on prints, logos, zippers, or brim details, NO human face or figure visible, artificial studio lighting with metallic reflections, dark background to isolate the subject. Macro perspective, high sharpness, high contrast.",
+        prompt_cn: "基于产品图，生成服装细节特写图。聚焦印花、logo、拉链、帽檐等设计细节，画面中无人脸或人物，人工打光，金属质感反光，背景暗色突出主体。微距视角，锐度高，高对比。"
       },
       {
         seq: 6, name: "定格结尾", purpose: "视频结尾，定格+文案空间",
-        prompt: "Based on the product image, generate a freeze-frame side or back view. Simplified background, spotlight effect, subject perfectly still, garment fully displayed, unified color palette, negative space reserved for text overlay.",
-        prompt_cn: "基于产品图，生成人物侧身或背影的定格图。简化背景，聚光灯效果，人物静止，服装完整展示，色调统一，留出版式空间用于加文字。"
+        prompt: "Based on the product image, generate a freeze-frame ending shot. Person shown from behind or as a side silhouette, face COMPLETELY INVISIBLE, no facial features visible, simplified background, spotlight effect, garment fully displayed, unified color palette, generous negative space reserved for text overlay.",
+        prompt_cn: "基于产品图，生成人物定格结尾图。人物背面或侧面剪影，面部完全不可见，简化背景，聚光灯效果，服装完整展示，色调统一，留出版式空间用于加文字。"
       },
     ],
     video_prompts: {
-      seedance: "Street-style fashion showcase, fast pace, high-contrast lighting, saturated colors, city street backdrop with neon signs and concrete walls, confident expression, strong dynamics, wide-angle perspective, beat-driven rhythm",
-      seedance_cn: "潮流街头服装展示，快节奏，高对比光影，饱和色彩，城市街道背景，霓虹灯和水泥墙，人物自信表情，动态强，广角透视，节奏卡点感",
+      seedance: "Street-style fashion showcase, fast pace, high-contrast lighting, saturated colors, city street backdrop with neon signs and concrete walls, strong dynamics, wide-angle perspective, beat-driven rhythm, garment details and urban textures in focus",
+      seedance_cn: "潮流街头服装展示，快节奏，高对比光影，饱和色彩，城市街道背景，霓虹灯和水泥墙，动态强，广角透视，节奏卡点感，聚焦服装细节和都市质感",
       kling_per_frame: [
-        { seq: 1, prompt: "Fast push-in to face close-up, hard-cut style, high contrast", prompt_cn: "快速推近到面部特写，硬切风格，高对比" },
-        { seq: 2, prompt: "Low-angle shot, subject striding toward camera, wide-angle perspective impact", prompt_cn: "低角度仰拍，人物大步走来，广角透视冲击感" },
-        { seq: 3, prompt: "Quick flash-cut to detail close-up, slight camera shake for energy", prompt_cn: "快速闪切到细节特写，镜头微晃增加动感" },
-        { seq: 4, prompt: "High-speed freeze of dynamic moment with slight slow-motion replay for impact", prompt_cn: "快门凝固动态瞬间后微慢放，增强冲击力" },
-        { seq: 5, prompt: "Camera pans across neon lights, color gradient transition", prompt_cn: "镜头横移扫过霓虹灯光，色彩渐变过渡" },
+        { seq: 1, prompt: "Fast push-in toward product detail, hard-cut style, high contrast lighting", prompt_cn: "快速推近产品细节，硬切风格，高对比光影" },
+        { seq: 2, prompt: "Low-angle shot tracking the back-view figure walking, wide-angle perspective impact", prompt_cn: "低角度跟踪背影人物行走，广角透视冲击感" },
+        { seq: 3, prompt: "Camera slowly pans around the side silhouette, rim light emphasizing outline", prompt_cn: "镜头缓慢环绕侧面剪影，轮廓光强调边缘" },
+        { seq: 4, prompt: "Camera slowly orbits the atmospheric side-profile, neon light reflections shifting", prompt_cn: "镜头缓慢环绕氛围侧影，霓虹灯光反射变化" },
+        { seq: 5, prompt: "Quick flash-cut to detail close-up, slight camera shake for energy", prompt_cn: "快速闪切到细节特写，镜头微晃增加动感" },
         { seq: 6, prompt: "Camera slowly pushes in then freezes, leaving space for text overlay", prompt_cn: "镜头缓慢推近后定格，留出版式空间" },
       ],
     },
@@ -261,30 +261,30 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
     fallback_model: "kling-v3",
     default_resolution: "1080p",
     default_storyboard_count: 3,
-    cost_hint: "分镜图9积分 + 视频约70-130积分（视时长分辨率）",
+    cost_hint: "分镜图9积分 + 视频按秒计费（Seedance 9积分/秒，Kling每段3.6积分/秒）",
     storyboards: [
       {
-        seq: 1, name: "轮廓剪影", purpose: "视频开头，慢推镜头展示轮廓",
-        prompt: "Based on the product image, generate a silhouette or full-view showcase against a minimalist solid background (dark gray, off-white, or black). A single strong light source from the side or behind creates a distinct rim light on the garment, the person standing with elegant, restrained posture. Wide aperture shallow depth of field, background fully blurred or solid color.",
-        prompt_cn: "基于产品图，生成服装轮廓剪影或全景展示图。极简纯色背景（深灰或米白或黑），单一强光源从侧面或背后打入，人物侧身或正面站立，姿态优雅克制，服装轮廓光明显，面料质感在光下有细微反光。大光圈浅景深，背景完全虚化或纯色。"
+        seq: 1, name: "产品特写", purpose: "视频开头，展示产品轮廓和材质",
+        prompt: "Based on the product image, generate a product close-up shot in luxury cinematic style. The garment placed against a minimalist solid background (dark gray, off-white, or black), a single strong light source from the side or behind creates a distinct rim light on the product, NO human face or figure visible, focus entirely on the garment silhouette, material texture, and luminous sheen. Wide aperture shallow depth of field, background fully blurred or solid color.",
+        prompt_cn: "基于产品图，生成高级质感风格产品特写图。服装放置在极简纯色背景上（深灰或米白或黑），单一强光源从侧面或背后打入，产品边缘轮廓光明显，画面中无人脸或人物，完全聚焦服装轮廓、材质质感和光泽。大光圈浅景深，背景完全虚化或纯色。"
       },
       {
-        seq: 2, name: "面料光影", purpose: "视频中间，慢推特写展示质感",
-        prompt: "Based on the product image, generate a close-up of the fabric under dramatic lighting. Strong side-light or top-light reveals the texture of silk, wool, or lace, creating smooth gradients of highlight and shadow across the fabric surface. Dark or pure black background to emphasize the fabric's natural sheen. Macro or close-up shot, precise focus.",
-        prompt_cn: "基于产品图，生成面料在特殊光线下的特写图。强侧光或顶光照射面料，展示丝绸或羊毛或蕾丝等纹理，光影在服装表面形成渐变，高光和阴影层次丰富。背景暗色或纯黑，突出面料本身的光泽感。微距或近景，焦点精确。"
+        seq: 2, name: "氛围侧影", purpose: "氛围镜头，轻微露脸",
+        prompt: "Based on the product image, generate an atmospheric side-profile shot in luxury cinematic style. Person in side profile or looking downward, face NOT fully visible, elegant loose hair naturally drifting across the cheeks in a gentle breeze, delicately veiling the features, NEVER facing the camera directly. Single strong light source creating cinematic Rembrandt or butterfly lighting on the garment, sophisticated and quiet. Wide aperture shallow depth of field, monochromatic gradient tones.",
+        prompt_cn: "基于产品图，生成高级质感氛围侧影图。人物侧脸或低头，面部不完全可见，优雅散发在微风中自然飘过面颊，精致地轻遮五官，绝不正对镜头。单一强光源制造电影感伦勃朗光或蝴蝶光，高级安静感。大光圈浅景深，同色系渐变色调。"
       },
       {
-        seq: 3, name: "情绪肖像", purpose: "视频结尾，慢拉镜头，淡出",
-        prompt: "Based on the product image, generate an emotional portrait. The person's face turned slightly away, eyes avoiding the camera, expression serene and elevated. Soft, even lighting (butterfly or Rembrandt pattern), garment occupying about 60% of the frame with generous negative space. Unified tonal palette — monochromatic gradient or black-and-white, composition referencing high-end fashion editorial.",
-        prompt_cn: "基于产品图，生成人物情绪化肖像图。人物微侧脸，眼神避开镜头，表情淡然高级，光线柔和均匀（蝴蝶光或伦勃朗光），服装在画面中占比约60%，其余是留白空间。色调统一，同色系渐变或黑白，构图参考高端时尚杂志大片。"
+        seq: 3, name: "结尾定格", purpose: "视频结尾，大量留白淡出",
+        prompt: "Based on the product image, generate an ending freeze-frame shot in luxury cinematic style. Person shown from behind or as a side silhouette, face COMPLETELY INVISIBLE, no facial features visible, garment occupying about 50% of the frame with generous negative space. Soft even lighting, monochromatic gradient or black-and-white tones, composition referencing high-end fashion editorial.",
+        prompt_cn: "基于产品图，生成高级质感结尾定格图。人物背面剪影或侧面，面部完全不可见，服装在画面中占比约50%，其余是大面积留白。光线柔和均匀，同色系渐变或黑白色调，构图参考高端时尚杂志大片。"
       },
     ],
     video_prompts: {
-      seedance: "Luxury cinematic fashion showcase, minimalist background, single strong light source, Rembrandt or butterfly lighting, shallow depth of field with wide aperture and blurred background, extremely slow push-and-pull camera, low-saturation monochromatic gradient tones, high-end editorial magazine style, generous negative space, quiet and powerful",
-      seedance_cn: "高级质感服装展示，电影感，极简背景，单一强光源，伦勃朗光或蝴蝶光，浅景深大光圈背景虚化，镜头缓慢推拉节奏极慢，低饱和同色系渐变色调，高端时尚杂志风格，留白多，安静有力量感",
+      seedance: "Luxury cinematic fashion showcase, minimalist background, single strong light source, Rembrandt or butterfly lighting, shallow depth of field with wide aperture and blurred background, extremely slow push-and-pull camera, low-saturation monochromatic gradient tones, high-end editorial magazine style, generous negative space, quiet and powerful, garment texture and drape in focus",
+      seedance_cn: "高级质感服装展示，电影感，极简背景，单一强光源，伦勃朗光或蝴蝶光，浅景深大光圈背景虚化，镜头缓慢推拉节奏极慢，低饱和同色系渐变色调，高端时尚杂志风格，留白多，安静有力量感，聚焦服装质感和垂坠",
       kling_per_frame: [
-        { seq: 1, prompt: "Camera slowly pushes in from the silhouette, maintaining an extremely slow pace", prompt_cn: "镜头从剪影轮廓缓慢推近，保持极慢节奏" },
-        { seq: 2, prompt: "Camera pans across the fabric light-and-shadow play, maintaining macro focus", prompt_cn: "镜头横移扫过面料光影，保持微距焦点" },
+        { seq: 1, prompt: "Camera slowly pushes in toward the product, single light source creating rim light, extremely slow pace", prompt_cn: "镜头缓慢推近产品，单一光源制造轮廓光，极慢节奏" },
+        { seq: 2, prompt: "Camera slowly orbits the side-profile figure, light and shadow shifting across the garment", prompt_cn: "镜头缓慢环绕侧影人物，光影在服装上流动变化" },
         { seq: 3, prompt: "Camera extremely slowly pulls back, increasing negative space, fading out", prompt_cn: "镜头极缓慢拉远，增加留白，淡出收尾" },
       ],
     },
@@ -304,37 +304,37 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
     fallback_model: "kling-v3",
     default_resolution: "720p",
     default_storyboard_count: 4,
-    cost_hint: "分镜图12积分 + 视频约45-85积分（视时长分辨率）",
+    cost_hint: "分镜图12积分 + 视频按秒计费（Seedance 9积分/秒，Kling每段3.6积分/秒）",
     storyboards: [
       {
-        seq: 1, name: "上班场景", purpose: "视频开头，建立场景代入",
-        prompt: "Based on the product image, generate a commuter outfit shot in a professional setting. The person walks down an office corridor or café carrying a bag, natural friendly smile, slightly turned toward the camera. Bright, even lighting — office natural light or warm café light — with the background moderately blurred to preserve the workplace atmosphere.",
-        prompt_cn: "基于产品图，生成职场通勤场景的穿搭图。人物提着包走在办公室走廊或咖啡厅，自然微笑，表情亲和专业，微侧身看向镜头。光线明亮均匀，办公室自然光或咖啡厅暖光，背景适度虚化，保留职场氛围。"
+        seq: 1, name: "产品特写", purpose: "视频开头，建立职场场景",
+        prompt: "Based on the product image, generate a product close-up shot in office-commute style. The garment placed in an office or café setting, natural light streaming through windows, NO human face or figure visible, focus entirely on the product silhouette and fabric quality in a professional environment. Bright even lighting, accurate color reproduction, background moderately blurred to preserve workplace atmosphere.",
+        prompt_cn: "基于产品图，生成职场通勤风格产品特写图。服装放置在办公室或咖啡厅场景中，窗户自然光照射，画面中无人脸或人物，完全聚焦产品轮廓和面料质感。光线明亮均匀，色彩还原准确，背景适度虚化保留职场氛围。"
       },
       {
-        seq: 2, name: "正面展示", purpose: "清晰展示服装版型",
-        prompt: "Based on the product image, generate a clear front-view showcase of the garment. Solid or minimalist background, even lighting across the clothing, full-body front shot, natural standing pose with arms at sides or in pockets, focus on the overall cut and silhouette. Accurate color reproduction, no heavy filters.",
-        prompt_cn: "基于产品图，生成服装正面清晰展示图。纯色或简约背景，光线均匀打在服装上，正面全身照，姿态自然站立，双手自然下垂或插兜，焦点在服装整体剪裁和版型。色彩还原准确，不过度滤镜。"
+        seq: 2, name: "背面/侧面穿搭", purpose: "展示服装版型剪裁",
+        prompt: "Based on the product image, generate a back or side-view outfit showcase in office-commute style. Person shown from behind or in strict side profile, face COMPLETELY INVISIBLE, no facial features visible, wearing the garment in a natural standing pose with arms at sides or in pockets. Focus on the overall cut, silhouette, and drape. Solid or minimalist background, even lighting across the clothing, accurate color reproduction.",
+        prompt_cn: "基于产品图，生成职场通勤风格背面/侧面穿搭图。人物背面或严格侧面，面部完全不可见，穿着该服装自然站立，双手下垂或插兜。焦点在服装整体剪裁、版型和垂坠感。纯色或简约背景，光线均匀，色彩还原准确。"
       },
       {
-        seq: 3, name: "搭配细节", purpose: "快速展示设计亮点",
-        prompt: "Based on the product image, generate a styling detail shot. Focus on collar, cuffs, waistline, or buttons — key design highlights — with the person in a seated pose or using hand gestures to draw attention. Light concentrated on the detail area, background slightly darkened. Medium close-up, high information density.",
-        prompt_cn: "基于产品图，生成穿搭搭配细节图。聚焦领口、袖口、腰线、纽扣等设计亮点，人物坐姿或手部动作配合展示，光线聚焦在细节处，背景适度暗化。近景或中近景，信息密度高。"
+        seq: 3, name: "氛围侧影", purpose: "氛围镜头，轻微露脸",
+        prompt: "Based on the product image, generate an atmospheric side-profile shot in office-commute style. Person in side profile or looking downward, face NOT fully visible, loose strands of hair naturally drifting across the cheeks, partially veiling the face, NEVER facing the camera directly. Professional setting background (office corridor or café), bright even lighting, understated and professional atmosphere.",
+        prompt_cn: "基于产品图，生成职场通勤风格氛围侧影图。人物侧脸或低头，面部不完全可见，碎发自然飘过面颊轻遮面部，绝不正对镜头。职业场景背景（办公室走廊或咖啡厅），光线明亮均匀，低调专业氛围。"
       },
       {
-        seq: 4, name: "实用展示", purpose: "视频结尾，强化实穿信任感",
-        prompt: "Based on the product image, generate a practical wear shot of the person seated or walking. Showing how the garment performs during real movement — not too tight, no excessive wrinkling. Office chair or café seating scenario, natural lighting, relaxed posture, medium shot, strong sense of authenticity.",
-        prompt_cn: "基于产品图，生成人物坐下或行走时的穿搭图。展示服装在真实动作下的版型表现，不紧绷、不褶皱过度。办公室椅子或咖啡厅座位场景，光线自然，姿态放松，中景构图，真实感强。"
+        seq: 4, name: "结尾展示", purpose: "视频结尾，实穿场景收尾",
+        prompt: "Based on the product image, generate an ending back or side-silhouette shot in office-commute style. Person shown from behind or as a side silhouette, face COMPLETELY INVISIBLE, no facial features visible, sitting at an office desk or walking in a corridor. Garment performance in real movement, natural lighting, medium shot, strong sense of authenticity and practicality.",
+        prompt_cn: "基于产品图，生成职场通勤风格结尾展示图。人物背面或侧面剪影，面部完全不可见，坐在办公桌前或走在走廊中。展示服装在真实动作下的版型表现，光线自然，中景构图，真实感和实用感强。"
       },
     ],
     video_prompts: {
-      seedance: "Professional commuter fashion showcase, bright and clear, information-first presentation, office or café setting, natural light, steady camera with standard focal length, natural friendly smile, accurate color reproduction, practical outfit display with clear silhouette",
-      seedance_cn: "职场通勤服装展示，明亮清晰，信息展示优先，办公室或咖啡厅场景，自然光，平稳镜头标准焦段，人物自然微笑亲和专业感，色彩还原准确，实用穿搭展示，版型清晰",
+      seedance: "Professional commuter fashion showcase, bright and clear, information-first presentation, office or café setting, natural light, steady camera with standard focal length, garment silhouette and cut clearly displayed, accurate color reproduction, practical outfit display",
+      seedance_cn: "职场通勤服装展示，明亮清晰，信息展示优先，办公室或咖啡厅场景，自然光，平稳镜头标准焦段，服装版型和剪裁清晰展示，色彩还原准确，实用穿搭展示",
       kling_per_frame: [
-        { seq: 1, prompt: "Camera follows the walking subject, steady lateral movement, medium shot", prompt_cn: "镜头跟随人物行走，平稳移动，保持中景" },
-        { seq: 2, prompt: "Fixed front-facing camera, slowly pushing in to show silhouette details", prompt_cn: "镜头固定正面，缓慢推近展示版型细节" },
-        { seq: 3, prompt: "Camera pushes in to a detail close-up, focus on collar or cuffs", prompt_cn: "镜头推近到细节特写，焦点在领口或袖口" },
-        { seq: 4, prompt: "Camera slowly pulls back from medium shot, revealing the full outfit", prompt_cn: "镜头从中景缓慢拉远，展示整体穿搭效果" },
+        { seq: 1, prompt: "Camera slowly pushes in toward the product on desk, natural light, even lighting", prompt_cn: "镜头缓慢推近桌面上的产品，自然光，光线均匀" },
+        { seq: 2, prompt: "Camera slowly tracks alongside the back-view figure, showing silhouette details", prompt_cn: "镜头缓慢跟随背影人物侧移，展示版型细节" },
+        { seq: 3, prompt: "Camera slowly orbits the side-profile figure, professional setting in background", prompt_cn: "镜头缓慢环绕侧影人物，职业场景背景" },
+        { seq: 4, prompt: "Camera slowly pulls back from medium shot, revealing the full outfit in real setting", prompt_cn: "镜头从中景缓慢拉远，展示整体穿搭在真实场景中的效果" },
       ],
     },
     copywriting_prompt: "你是一位小红书职场穿搭博主，请为以下服装撰写一篇种草笔记。要求：标题含emoji、正文实用接地气、突出版型和实穿性、多用\"显瘦\"\"百搭\"\"上班穿\"等词汇、可加入搭配建议、结尾加话题标签。服装信息：{clothing_info}",
@@ -353,43 +353,43 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
     fallback_model: "seedance-2.0",
     default_resolution: "1080p",
     default_storyboard_count: 5,
-    cost_hint: "分镜图15积分 + 视频约75-175积分（5段拼接，视时长分辨率）",
+    cost_hint: "分镜图15积分 + 视频按秒计费（Seedance 9积分/秒，Kling每段3.6积分/秒×5段）",
     storyboards: [
       {
-        seq: 1, name: "场景引入", purpose: "视频开头，今天穿什么",
-        prompt: "Based on the product image, generate a lifestyle opening scene. The person at home or standing in front of a mirror, expression slightly hesitant or thoughtful, holding a phone or standing before an open wardrobe. Interior natural lighting. Background is a real bedroom or living room, not overly styled.",
-        prompt_cn: "基于产品图，生成生活化场景的开场图。人物在家中或镜子前，表情略带犹豫或思考，手持手机或站在衣柜前，光线是室内自然光。背景是真实的卧室或客厅环境，不过度布置。"
+        seq: 1, name: "产品静物", purpose: "视频开头，产品在生活场景中",
+        prompt: "Based on the product image, generate a product still-life shot in lifestyle setting. The garment placed naturally on a desk, beside a wardrobe, or draped over a chair, NO human face or figure visible, focus entirely on the product in a cozy real-life interior. Soft indoor natural lighting, authentic and unforced atmosphere, warm tones.",
+        prompt_cn: "基于产品图，生成剧情植入风格产品静物图。服装自然放置在桌面、衣柜旁或搭在椅子上，画面中无人脸或人物，完全聚焦产品在温馨真实室内场景中的呈现。室内自然光，真实不做作的氛围，暖色调。"
       },
       {
-        seq: 2, name: "穿上转变", purpose: "情绪转折点",
-        prompt: "Based on the product image, generate a transformation shot after putting on the garment. Mirror selfie or friend-photographing scenario, the person's expression shifting from hesitation to a confident smile. Bright lighting — ring light or window natural light — garment prominently displayed, background in front of a mirror or outdoors.",
-        prompt_cn: "基于产品图，生成人物穿上服装后的转变图。镜前自拍或朋友拍照场景，人物表情从犹豫变为自信微笑。光线明亮，自拍补光灯或窗边自然光，服装在画面中突出展示，背景是镜前或户外。"
+        seq: 2, name: "背面穿搭", purpose: "展示穿上后的背面效果",
+        prompt: "Based on the product image, generate a back-view outfit shot in lifestyle setting. Person shown from behind, face COMPLETELY INVISIBLE, no facial features visible, wearing the garment. Interior or doorway scene, soft natural light from windows, garment silhouette and drape clearly visible. Authentic real-life feel, unforced and natural.",
+        prompt_cn: "基于产品图，生成剧情植入风格背面穿搭图。人物背面，面部完全不可见，穿着该服装。室内或门口场景，窗户柔和自然光，服装轮廓和垂坠感清晰可见。真实生活感，自然不做作。"
       },
       {
-        seq: 3, name: "场景使用", purpose: "展示实穿场景",
-        prompt: "Based on the product image, generate the garment worn in its target scenario. Commuter wear: walking down the street or entering an office. Date outfit: café or restaurant. Activewear: gym or park. Lighting shifts naturally with the setting, authentic and unforced.",
-        prompt_cn: "基于产品图，生成服装在目标场景中的使用图。通勤装：走在街上或进办公室；约会装：咖啡厅或餐厅；运动装：健身房或公园。光线跟随场景变化，真实自然。"
+        seq: 3, name: "侧面剪影", purpose: "展示穿搭轮廓",
+        prompt: "Based on the product image, generate a side-silhouette shot in lifestyle setting. Person in strict side profile, face COMPLETELY TURNED AWAY from the camera and INVISIBLE, displaying the full outfit silhouette and cut. Indoor natural light, real-life setting such as a hallway or living room, garment structure clearly visible. Authentic and candid feel.",
+        prompt_cn: "基于产品图，生成剧情植入风格侧面剪影图。人物严格侧面，面部完全转离镜头不可见，展示完整穿搭轮廓和版型。室内自然光，真实生活场景如走廊或客厅，服装结构清晰可见。真实自然感。"
       },
       {
-        seq: 4, name: "细节互动", purpose: "增强真实感和代入感",
-        prompt: "Based on the product image, generate a detail shot of the person interacting with the garment. Adjusting a collar, buttoning up, pulling a zipper — a captured action moment. Hands clearly in motion, focused expression. Medium close-up, focus on the action and clothing detail.",
-        prompt_cn: "基于产品图，生成人物与服装互动的细节图。整理衣领、系扣子、拉拉链等动作瞬间，手部动作清晰，表情专注自然。近景或中近景，焦点在动作和服装细节。"
+        seq: 4, name: "氛围侧影", purpose: "氛围镜头，情绪转折点，轻微露脸",
+        prompt: "Based on the product image, generate an atmospheric side-profile shot in lifestyle setting. Person in side profile or looking downward, face NOT fully visible, loose strands of hair naturally drifting across the cheeks, partially veiling the face, NEVER facing the camera directly. Emotional turning point, soft window light or interior warm lighting, candid storytelling moment, genuine and touching.",
+        prompt_cn: "基于产品图，生成剧情植入风格氛围侧影图。人物侧脸或低头，面部不完全可见，碎发自然飘过面颊轻遮面部，绝不正对镜头。情绪转折点，柔和窗光或室内暖光，自然故事感瞬间，真实动人。"
       },
       {
-        seq: 5, name: "结尾展示", purpose: "定格+购买引导",
-        prompt: "Based on the product image, generate a confident final showcase shot. Attractive background (rooftop, street, or natural setting), person facing the camera or slightly turned, smiling naturally, garment fully displayed, beautiful lighting. Composition leaves negative space for text overlay.",
-        prompt_cn: "基于产品图，生成人物自信展示的结尾图。在好看的背景前（天台或街道或自然场景），人物正面或微侧，微笑看镜头或自然姿态，服装完整展示，光线美好。构图留出版式空间用于加文案。"
+        seq: 5, name: "结尾定格", purpose: "定格结尾，留白版式空间",
+        prompt: "Based on the product image, generate an ending freeze-frame shot in lifestyle setting. Person shown from behind or as a distant figure, face COMPLETELY INVISIBLE, no facial features visible, standing in an attractive setting (rooftop, doorway, or window light). Beautiful lighting, garment fully displayed, composition leaves generous negative space for text overlay.",
+        prompt_cn: "基于产品图，生成剧情植入风格结尾定格图。人物背面或远影，面部完全不可见，站在好看的场景前（天台、门口或窗光下）。光线美好，服装完整展示，构图留出版式空间用于加文案。"
       },
     ],
     video_prompts: {
-      seedance: "Narrative fashion showcase, lifestyle setting, authentic feel, natural light, true-to-life colors, emotional arc from hesitation to confidence, handheld shooting feel, storytelling rhythm",
-      seedance_cn: "剧情式服装展示，生活化场景，真实感，自然光，真实色彩，人物有情绪变化，手持拍摄感，叙事节奏，从犹豫到自信的情绪弧线",
+      seedance: "Narrative fashion showcase, lifestyle setting, authentic feel, natural light, true-to-life colors, emotional arc from contemplation to confidence, handheld shooting feel, storytelling rhythm, garment texture and drape emphasized",
+      seedance_cn: "剧情式服装展示，生活化场景，真实感，自然光，真实色彩，从沉思到自信的情绪弧线，手持拍摄感，叙事节奏，聚焦服装质感和垂坠",
       kling_per_frame: [
-        { seq: 1, prompt: "Handheld camera with subtle shake, simulating an authentic phone-shot perspective, indoor natural light", prompt_cn: "手持镜头轻微晃动，模拟真实手机拍摄视角，室内自然光" },
-        { seq: 2, prompt: "Camera slowly pushes from the hesitant expression to the confident smile, emotional turning point", prompt_cn: "镜头从犹豫表情缓慢推到自信微笑，情绪转折点" },
-        { seq: 3, prompt: "Camera follows the subject into the scene, medium shot, natural transition", prompt_cn: "镜头跟随人物走进场景，保持中景，自然过渡" },
-        { seq: 4, prompt: "Camera pushes in to a hand-action close-up, focus on clothing detail", prompt_cn: "镜头推近到手部动作特写，焦点在服装细节" },
-        { seq: 5, prompt: "Camera slowly pulls back, subject standing confident, leaving space for text overlay", prompt_cn: "镜头缓慢拉远，人物自信站定，留出版式空间" },
+        { seq: 1, prompt: "Handheld camera slowly approaches the still-life product, indoor natural light, intimate feel", prompt_cn: "手持镜头缓慢接近静物产品，室内自然光，亲密感" },
+        { seq: 2, prompt: "Camera slowly tracks alongside the back-view figure, natural swaying movement", prompt_cn: "镜头缓慢跟随背影人物侧移，自然摇曳动态" },
+        { seq: 3, prompt: "Camera slowly pans around the side silhouette, garment outline in focus", prompt_cn: "镜头缓慢环绕侧面剪影，聚焦服装轮廓" },
+        { seq: 4, prompt: "Camera slowly orbits the atmospheric side-profile, emotional turning point, soft light shifting", prompt_cn: "镜头缓慢环绕氛围侧影，情绪转折点，柔光变化" },
+        { seq: 5, prompt: "Camera slowly pulls back, figure in distant view, leaving space for text overlay", prompt_cn: "镜头缓慢拉远，人物远景，留出版式空间" },
       ],
     },
     copywriting_prompt: "你是一位小红书生活方式博主，请为以下服装撰写一篇剧情式种草笔记。要求：标题含emoji、正文以\"今天穿什么\"的故事开头、突出穿上后的自信转变、多用\"出门被夸\"\"男友视角\"\"上班第一天\"等场景化词汇、结尾加话题标签。服装信息：{clothing_info}",
@@ -578,6 +578,15 @@ export function listSessions(userId: number, page = 1, limit = 10): { items: Sho
   return { items, total };
 }
 
+/** 更新会话的故事板数据 */
+export function updateSessionStoryboard(sessionId: string, storyboardJson: string): void {
+  const db = getDb();
+  db.run(
+    "UPDATE shouzuo_sessions SET storyboard_json = ?, updated_at = datetime('now') WHERE id = ?",
+    [storyboardJson, sessionId],
+  );
+}
+
 // ===========================================================
 // Step 2：AI 识别 + 风格推荐
 // ===========================================================
@@ -604,11 +613,13 @@ export function saveAiRecognition(
 // ===========================================================
 
 /**
- * 计算预估积分
+ * 计算预估积分 — 按秒计费
  * 公式：总分镜积分 + 总视频积分
  * 分镜积分 = storyboard_count × 3
- * 视频积分（Seedance）= 查 video_pricing 表
- * 视频积分（Kling）= 单段积分 × storyboard_count
+ * 视频积分 = 每秒单价 × 时长（秒）
+ *   Seedance：单段，720p = 9积分/秒，1080p = 14积分/秒
+ *   Kling：  多段（每段单独），720p = 3.6积分/秒，1080p = 5.6积分/秒
+ * 最终向上取整（Math.ceil），避免出现小数积分
  */
 export function calculateEstimatedCredits(
   styleId: string,
@@ -620,23 +631,20 @@ export function calculateEstimatedCredits(
   // 分镜积分
   const storyboardCredits = videoParams.storyboard_count * 3;
 
-  // 视频积分
+  // 视频积分 — 按秒计费
   let videoCredits = 0;
+  const duration = videoParams.duration;
+  const resolution = videoParams.resolution;
+
   if (videoParams.model === "seedance-2.0") {
-    // Seedance：1段视频
-    const pricing: Record<string, number> = {
-      "720p-5": 45, "720p-8": 60, "720p-10": 75, "720p-15": 95,
-      "1080p-5": 70, "1080p-8": 90, "1080p-10": 110, "1080p-15": 140,
-    };
-    videoCredits = pricing[`${videoParams.resolution}-${videoParams.duration}`] ?? 75;
+    // Seedance：1段视频，按秒计费
+    const perSecond = resolution === "1080p" ? 14 : 9;
+    videoCredits = Math.ceil(perSecond * duration);
   } else {
-    // Kling：分镜数段视频，每段单独计费
-    const perSegment: Record<string, number> = {
-      "720p-5": 18, "720p-8": 24, "720p-10": 30, "720p-15": 40,
-      "1080p-5": 28, "1080p-8": 38, "1080p-10": 48, "1080p-15": 60,
-    };
-    const segCredits = perSegment[`${videoParams.resolution}-${videoParams.duration}`] ?? 30;
-    videoCredits = segCredits * videoParams.storyboard_count;
+    // Kling：每段按秒计费
+    const perSecond = resolution === "1080p" ? 5.6 : 3.6;
+    const perSegment = Math.ceil(perSecond * duration);
+    videoCredits = perSegment * videoParams.storyboard_count;
   }
 
   return storyboardCredits + videoCredits;
@@ -861,30 +869,6 @@ export function saveCopywriting(
 // 工具函数
 // ===========================================================
 
-/** 各风格的规避真人描述（追加到分镜 prompt 末尾） */
-const FACE_AVOIDANCE: Record<string, { en: string; cn: string }> = {
-  "japanese-mori": {
-    en: "Fashion photography with face naturally turned away from camera or partially hidden by hair, emphasis on garment and atmosphere.",
-    cn: "时尚摄影，面部自然转开或被发丝轻遮，重点展示服装和氛围。",
-  },
-  "street-urban": {
-    en: "Editorial fashion photography, face hidden by shadow or wearing sunglasses or cap looking down, strong emphasis on garment.",
-    cn: "时尚大片摄影，面部被阴影遮挡或佩戴墨镜/帽子低头，重点展示服装。",
-  },
-  "luxury-cinematic": {
-    en: "High-end fashion photography, face turned away from camera or silhouetted against light, emphasis on garment silhouette and fabric.",
-    cn: "高端时尚摄影，面部侧转或逆光剪影，重点展示服装轮廓和面料。",
-  },
-  "office-commute": {
-    en: "Professional fashion photography, face naturally turned to the side or partially cropped out of frame, clear focus on garment cut and fit.",
-    cn: "职业时尚摄影，面部自然微侧或局部裁出画框，清晰焦点在服装版型。",
-  },
-  "story-lifestyle": {
-    en: "Lifestyle fashion photography, face naturally turned away or partially out of frame, narrative focus on garment in daily life.",
-    cn: "生活时尚摄影，面部自然转开或局部在画框外，重点展示服装在日常场景中。",
-  },
-};
-
 /** 获取分镜提示词（合成后传入 GPT-Image-2） */
 export function buildStoryboardPrompt(
   styleId: string,
@@ -905,9 +889,7 @@ export function buildStoryboardPrompt(
     `Season: ${clothingInfo.season.join("/")}`,
   ].join(", ");
 
-  const faceText = FACE_AVOIDANCE[styleId];
-  const faceSuffix = faceText ? ` ${faceText.en}` : "";
-  const prompt = `${frame.prompt}${faceSuffix}. ${clothingStr}. Photorealistic, high quality, 8k resolution, professional product photography.`;
+  const prompt = `${frame.prompt}. ${clothingStr}. Photorealistic, high quality, 8k resolution, professional product photography.`;
   return { prompt, name: frame.name };
 }
 

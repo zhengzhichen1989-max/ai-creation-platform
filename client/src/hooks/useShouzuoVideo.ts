@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { useShouzuoVideoStore } from '@/stores/shouzuoVideo.store';
 import * as shouzuoApi from '@/api/shouzuoVideo';
-import type { CopywritingItem, ProductInfo, VideoParams, StoryboardFrame } from '@/types/shouzuo';
+import type { CopywritingItem, CopywritingResult, ProductInfo, VideoParams, StoryboardFrame } from '@/types/shouzuo';
 
 /**
  * 种草视频主流程 Hook（6步工作流）
@@ -28,6 +28,7 @@ export function useShouzuoVideo() {
     videoParams,
     storyboard,
     isStoryboardGenerating,
+    changingAngleIndex,
     videoResult,
     isVideoGenerating,
     isVideoPolling,
@@ -50,6 +51,7 @@ export function useShouzuoVideo() {
     setVideoParams,
     setStoryboard,
     setStoryboardGenerating,
+    setChangingAngleIndex,
     setVideoResult,
     setVideoGenerating,
     setVideoPolling,
@@ -99,6 +101,9 @@ export function useShouzuoVideo() {
       const result = await shouzuoApi.createSession({ images: urls, productInfo: info });
       setSession(result);
       setStep('ai_recognize');
+
+      // 存 localStorage 用于刷新后恢复
+      localStorage.setItem('shouzuo_active_session', result.sessionId);
 
       return result;
     } catch (err: unknown) {
@@ -259,6 +264,41 @@ export function useShouzuoVideo() {
   }, [setError, setStep, setStoryboard, setStoryboardGenerating]);
 
   // ============================================================
+  // Step 4.5: 重新生成单帧分镜
+  // ============================================================
+
+  const regenerateSingleFrame = useCallback(async (frameIndex: number) => {
+    try {
+      const currentSession = useShouzuoVideoStore.getState().session;
+      const currentStoryboard = useShouzuoVideoStore.getState().storyboard;
+      if (!currentSession || !currentStoryboard) throw new Error('会话或故事板不存在');
+
+      setChangingAngleIndex(frameIndex);
+
+      const result = await shouzuoApi.regenerateSingleFrame(currentSession.sessionId, frameIndex);
+
+      // 更新 store 中的对应帧
+      const newFrames = [...currentStoryboard.frames];
+      newFrames[frameIndex] = {
+        ...newFrames[frameIndex],
+        seq: result.frame.seq,
+        name: result.frame.name,
+        prompt: result.frame.prompt,
+        prompt_cn: result.frame.prompt_cn,
+        imageUrl: result.frame.imageUrl,
+        status: 'completed' as const,
+        retry_count: (newFrames[frameIndex].retry_count || 0) + 1,
+      };
+      setStoryboard({ ...currentStoryboard, frames: newFrames });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '重新生成失败';
+      setError(msg);
+    } finally {
+      setChangingAngleIndex(null);
+    }
+  }, [setError, setStoryboard, setChangingAngleIndex]);
+
+  // ============================================================
   // Step 5: 生成视频
   // ============================================================
 
@@ -290,12 +330,14 @@ export function useShouzuoVideo() {
       // 轮询视频生成状态（从 store 实时读取 session，避免闭包陈旧值）
       if (result.status === 'processing' || result.status === 'pending') {
         setVideoPolling(true);
+        let pollErrorCount = 0;
         pollingRef.current = setInterval(async () => {
           try {
             const s = useShouzuoVideoStore.getState().session;
             if (!s) return;
             const updated = await shouzuoApi.getVideoStatus(s.sessionId);
             setVideoResult(updated);
+            pollErrorCount = 0; // 成功则重置计数
 
             if (updated.status === 'completed') {
               stopPolling();
@@ -305,7 +347,12 @@ export function useShouzuoVideo() {
               setError(updated.errorMessage || '视频生成失败');
             }
           } catch {
-            // 轮询错误静默处理
+            // 轮询错误（可能是 token 过期正在自动刷新），连续超过10次才停止
+            pollErrorCount++;
+            if (pollErrorCount >= 10) {
+              stopPolling();
+              setError('轮询中断，请刷新页面后重试');
+            }
           }
         }, 3000);
       } else if (result.status === 'completed') {
@@ -355,8 +402,128 @@ export function useShouzuoVideo() {
   }, [setError, setCopywritingItems, setCopywritingGenerating]);
 
   // ============================================================
-  // 工具函数
+  // Step 5.5: 视频状态轮询（恢复会话时复用）
   // ============================================================
+
+  /** 启动视频轮询（供恢复会话时调用） */
+  const startVideoPollingIfNeeded = useCallback(() => {
+    // 如果已经在轮询，不重复启动
+    if (pollingRef.current) return;
+
+    setVideoPolling(true);
+    let pollErrorCount = 0;
+    pollingRef.current = setInterval(async () => {
+      try {
+        const s = useShouzuoVideoStore.getState().session;
+        if (!s) return;
+        const updated = await shouzuoApi.getVideoStatus(s.sessionId);
+        setVideoResult(updated);
+        pollErrorCount = 0;
+
+        if (updated.status === 'completed') {
+          stopPolling();
+          setStep('copywriting');
+        } else if (updated.status === 'failed') {
+          stopPolling();
+          setError(updated.errorMessage || '视频生成失败');
+        }
+      } catch {
+        pollErrorCount++;
+        if (pollErrorCount >= 10) {
+          stopPolling();
+          setError('轮询中断，请刷新页面后重试');
+        }
+      }
+    }, 3000);
+  }, [setError, setStep, setVideoResult, setVideoPolling, stopPolling]);
+
+  // ============================================================
+  // 恢复会话（刷新页面后从 API 恢复 store 状态）
+  // ============================================================
+
+  /** 从 API 返回的 session 数据还原 store 状态 */
+  const restoreSession = useCallback(async (sessionId: string) => {
+    try {
+      setError(null);
+      const sessionData = await shouzuoApi.getSession(sessionId);
+
+      // 还原到 store
+      setSession(sessionData);
+      setUploadedUrls(sessionData.uploadedImages || []);
+
+      // 还原 AI 识别结果
+      if (sessionData.aiRecognition) {
+        setAiRecognition(sessionData.aiRecognition);
+        setNeedsPreprocessing(sessionData.aiRecognition.needs_preprocessing === true);
+      }
+
+      // 还原预处理状态
+      if (sessionData.preprocessed_image_url) {
+        setPreprocessedImageUrl(sessionData.preprocessed_image_url);
+      }
+      if (sessionData.preprocessing_status) {
+        setPreprocessingStatus(sessionData.preprocessing_status as 'idle' | 'generating' | 'completed' | 'failed');
+      }
+
+      // 还原风格选择
+      if (sessionData.selectedStyle) {
+        setSelectedStyle(sessionData.selectedStyle);
+      }
+
+      // 还原视频参数
+      if (sessionData.videoParams) {
+        setVideoParams(sessionData.videoParams);
+      }
+
+      // 还原故事板
+      if (sessionData.storyboard) {
+        setStoryboard(sessionData.storyboard);
+      }
+
+      // 还原视频结果
+      if (sessionData.videoResult) {
+        setVideoResult(sessionData.videoResult);
+        setVideoGenerating(false);
+        // 如果视频正在处理中，启动轮询
+        if (sessionData.videoResult.status === 'processing' || sessionData.videoResult.status === 'pending') {
+          startVideoPollingIfNeeded();
+        }
+      }
+
+      // 还原文案
+      if (sessionData.copywritingItems && sessionData.copywritingItems.length > 0) {
+        setCopywritingItems(sessionData.copywritingItems.map((cw: CopywritingResult, i: number) => ({
+          index: i,
+          title: cw.title,
+          body: cw.content,
+          hashtags: cw.tags,
+          platform: 'xiaohongshu' as const,
+          selected: true,
+        })));
+      }
+
+      // 设定步骤（安全校验：确保是合法的步骤值）
+      const validSteps: Array<string> = ['upload', 'ai_recognize', 'video_params', 'storyboard', 'video', 'copywriting'];
+      const restoredStep = sessionData.currentStep && validSteps.includes(sessionData.currentStep)
+        ? sessionData.currentStep
+        : 'upload';
+      setStep(restoredStep as any);
+
+      // 存 localStorage
+      localStorage.setItem('shouzuo_active_session', sessionId);
+
+      return sessionData;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '恢复会话失败';
+      setError(msg);
+      // 清除无效的 localStorage
+      localStorage.removeItem('shouzuo_active_session');
+      throw err;
+    }
+  }, [setError, setSession, setUploadedUrls, setAiRecognition, setNeedsPreprocessing,
+      setPreprocessedImageUrl, setPreprocessingStatus, setSelectedStyle,
+      setVideoParams, setStoryboard, setVideoResult, setVideoGenerating,
+      setCopywritingItems, setStep, startVideoPollingIfNeeded]);
 
   /** 获取选中文案的文本 */
   const getSelectedCopywriting = useCallback((): CopywritingItem[] => {
@@ -384,6 +551,7 @@ export function useShouzuoVideo() {
     videoParams,
     storyboard,
     isStoryboardGenerating,
+    changingAngleIndex,
     videoResult,
     isVideoGenerating,
     isVideoPolling,
@@ -401,12 +569,15 @@ export function useShouzuoVideo() {
     saveUserEditedClothing,
     confirmVideoParams,
     generateStoryboard,
+    regenerateSingleFrame,
     generateVideo,
     generateCopywriting,
+    restoreSession,
     setVideoModel,
     getSelectedCopywriting,
     getVideoUrl,
     stopPolling,
+    startVideoPollingIfNeeded,
     reset,
   };
 }

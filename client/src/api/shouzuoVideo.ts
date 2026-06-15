@@ -36,7 +36,9 @@ export async function uploadImages(files: File[]): Promise<string[]> {
 
 /** 创建种草视频会话 */
 export async function createSession(params: StartSessionParams): Promise<ShouzuoSession> {
-  const res = await apiClient.post<ApiResponse<ShouzuoSession>>('/shouzuo/session', params);
+  const res = await apiClient.post<ApiResponse<ShouzuoSession>>('/shouzuo/session', params, {
+    timeout: 60000,
+  });
   return res.data.data;
 }
 
@@ -47,7 +49,7 @@ export async function createSession(params: StartSessionParams): Promise<Shouzuo
 /** 获取图片分析结果 + 风格推荐 */
 export async function analyzeImages(sessionId: string): Promise<AiRecognitionResult> {
   const res = await apiClient.get<ApiResponse<AiRecognitionResult>>(`/shouzuo/session/${sessionId}/analyze`, {
-    timeout: 30000,
+    timeout: 120000,
   });
   return res.data.data;
 }
@@ -84,7 +86,7 @@ export async function confirmVideoParams(sessionId: string, params: VideoParams)
   await apiClient.post<ApiResponse<void>>(`/shouzuo/session/${sessionId}/confirm-params`, {
     sessionId,
     videoParams: params,
-  });
+  }, { timeout: 60000 });
 }
 
 // ============================================================
@@ -103,6 +105,18 @@ export async function generateStoryboard(params: GenerateStoryboardParams): Prom
 export async function regenerateStoryboard(params: GenerateStoryboardParams & { feedback?: string }): Promise<Storyboard> {
   const res = await apiClient.post<ApiResponse<Storyboard>>('/shouzuo/storyboard/regenerate', params, {
     timeout: 600000,
+  });
+  return res.data.data;
+}
+
+/** 重新生成单帧分镜（原"换角度"接口，现已简化为单帧重新生成） */
+export async function regenerateSingleFrame(sessionId: string, frameIndex: number): Promise<{
+  frame: { seq: number; name: string; prompt: string; prompt_cn: string; imageUrl: string; status: string };
+}> {
+  const res = await apiClient.post<ApiResponse<{
+    frame: { seq: number; name: string; prompt: string; prompt_cn: string; imageUrl: string; status: string };
+  }>>('/shouzuo/storyboard/change-angle', { sessionId, frameIndex }, {
+    timeout: 120000,
   });
   return res.data.data;
 }
@@ -145,13 +159,17 @@ export async function generateCopywriting(params: GenerateCopywritingParams): Pr
 
 /** 获取可用风格模板列表 */
 export async function getStyleTemplates(): Promise<StyleTemplate[]> {
-  const res = await apiClient.get<ApiResponse<StyleTemplate[]>>('/shouzuo/styles');
+  const res = await apiClient.get<ApiResponse<StyleTemplate[]>>('/shouzuo/styles', {
+    timeout: 60000,
+  });
   return res.data.data;
 }
 
 /** 获取会话状态 */
 export async function getSession(sessionId: string): Promise<ShouzuoSession> {
-  const res = await apiClient.get<ApiResponse<ShouzuoSession>>(`/shouzuo/session/${sessionId}`);
+  const res = await apiClient.get<ApiResponse<ShouzuoSession>>(`/shouzuo/session/${sessionId}`, {
+    timeout: 60000,
+  });
   return res.data.data;
 }
 

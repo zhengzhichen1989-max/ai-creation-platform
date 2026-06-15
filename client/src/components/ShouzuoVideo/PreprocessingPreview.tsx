@@ -1,5 +1,6 @@
 // ============================================================
 // 种草视频 - 服装预处理预览组件（Step 2.5）
+// 平铺图必须生成穿着效果图后才能进入后续步骤
 // ============================================================
 
 import {
@@ -17,7 +18,6 @@ interface PreprocessingPreviewProps {
   preprocessedImageUrl: string | null;
   preprocessingStatus: 'idle' | 'generating' | 'completed' | 'failed';
   onPreprocess: () => void;
-  onSkip: () => void;
   onConfirm: () => void;
   error: string | null;
 }
@@ -27,7 +27,6 @@ export default function PreprocessingPreview({
   preprocessedImageUrl,
   preprocessingStatus,
   onPreprocess,
-  onSkip,
   onConfirm,
   error,
 }: PreprocessingPreviewProps) {
@@ -36,9 +35,10 @@ export default function PreprocessingPreview({
       <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
         服装预处理
       </Typography>
-      <Alert severity="info" sx={{ mb: 2 }}>
-        系统检测到您上传的是平铺图（无人穿着）。建议自动生成穿着效果图，分镜效果更佳。
-        消耗3积分，也可跳过直接使用原图。
+      <Alert severity="warning" sx={{ mb: 2 }}>
+        系统检测到您上传的是<strong>平铺图（无人穿着）</strong>。
+        建议上传模特穿着图，分镜效果更佳；或者点击下方按钮自动生成穿着效果图。
+        <strong>注意：分镜生成必须有模特穿着图才能进行。</strong>
       </Alert>
 
       <Stack direction="row" spacing={3} sx={{ mb: 3, flexWrap: 'wrap' }}>
@@ -67,6 +67,7 @@ export default function PreprocessingPreview({
               <Stack alignItems="center" spacing={2}>
                 <CircularProgress size={40} />
                 <Typography variant="body2" color="text.secondary">正在生成穿着效果图...</Typography>
+                <Typography variant="caption" color="text.disabled">消耗3积分</Typography>
               </Stack>
             )}
             {preprocessingStatus === 'completed' && preprocessedImageUrl && (
@@ -78,9 +79,9 @@ export default function PreprocessingPreview({
               />
             )}
             {preprocessingStatus === 'failed' && (
-              <Typography variant="body2" color="error">生成失败，请重试或跳过</Typography>
+              <Typography variant="body2" color="error">生成失败，请重试</Typography>
             )}
-            {(preprocessingStatus === 'idle') && !preprocessedImageUrl && (
+            {(!preprocessedImageUrl || preprocessingStatus === 'idle') && (
               <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', px: 2 }}>
                 点击下方按钮生成穿着效果图
               </Typography>
@@ -91,50 +92,29 @@ export default function PreprocessingPreview({
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {/* 操作按钮 */}
+      {/* 操作按钮：无跳过选项，平铺图必须预处理 */}
       <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap' }}>
-        {preprocessingStatus === 'idle' && (
-          <>
-            <Button
-              variant="contained"
-              onClick={onPreprocess}
-              sx={{ minWidth: 200 }}
-            >
-              自动生成穿着效果图（3积分）
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={onSkip}
-            >
-              跳过，直接使用原图
-            </Button>
-          </>
+        {(preprocessingStatus === 'idle' || preprocessingStatus === 'failed') && (
+          <Button
+            variant="contained"
+            onClick={onPreprocess}
+            sx={{ minWidth: 220, fontWeight: 600 }}
+          >
+            自动生成穿着效果图（3积分）
+          </Button>
         )}
         {preprocessingStatus === 'generating' && (
           <Button variant="outlined" disabled>
             生成中，请稍候...
           </Button>
         )}
-        {preprocessingStatus === 'failed' && (
-          <>
-            <Button variant="contained" onClick={onPreprocess}>
-              重新生成（3积分）
-            </Button>
-            <Button variant="outlined" onClick={onSkip}>
-              跳过，直接使用原图
-            </Button>
-          </>
-        )}
         {preprocessingStatus === 'completed' && (
           <>
-            <Button variant="contained" onClick={onConfirm} sx={{ minWidth: 160 }}>
+            <Button variant="contained" onClick={onConfirm} sx={{ minWidth: 180, fontWeight: 600 }}>
               确认，继续下一步
             </Button>
             <Button variant="outlined" onClick={onPreprocess}>
               重新生成（3积分）
-            </Button>
-            <Button variant="text" onClick={onSkip}>
-              使用原图
             </Button>
           </>
         )}
