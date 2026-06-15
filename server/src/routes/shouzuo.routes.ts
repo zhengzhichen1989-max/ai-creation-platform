@@ -567,7 +567,7 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
         "UPDATE shouzuo_sessions SET user_edited_clothing_json = ?, updated_at = ? WHERE id = ? AND user_id = ?",
         [JSON.stringify(body.userEditedClothing), new Date().toISOString(), id, userId]
       );
-      shouzuoService.saveDatabase();
+      // saveDatabase() removed — sql.js auto-flushes on each write
     }
 
     return reply.send(successResponse({ success: true, currentStep: "ai_recognize" }));

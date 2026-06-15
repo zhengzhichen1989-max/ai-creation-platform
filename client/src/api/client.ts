@@ -106,8 +106,19 @@ apiClient.interceptors.response.use(
     }
 
     // Show error toast (for non-401 errors, auth endpoint 401s, and retried 401s)
-    const message =
-      error.response?.data?.message || error.message || '请求失败，请稍后重试';
+    let message: string;
+    if (!error.response && error.message) {
+      // 网络级错误（无HTTP响应）：超时、断网、CORS等
+      if (error.code === 'ECONNABORTED') {
+        message = '请求超时，请检查网络后重试';
+      } else if (error.message.includes('Network Error')) {
+        message = '网络连接失败，请检查网络后重试';
+      } else {
+        message = error.message;
+      }
+    } else {
+      message = error.response?.data?.message || error.message || '请求失败，请稍后重试';
+    }
     useSnackbarStore.getState().showSnackbar(message, 'error');
 
     return Promise.reject(error);

@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { useShouzuoVideoStore } from '@/stores/shouzuoVideo.store';
+import { useAuthStore } from '@/stores/auth.store';
 import * as shouzuoApi from '@/api/shouzuoVideo';
 import type { CopywritingItem, CopywritingResult, ProductInfo, VideoParams, StoryboardFrame } from '@/types/shouzuo';
 
@@ -349,10 +350,22 @@ export function useShouzuoVideo() {
           } catch {
             // 轮询错误（可能是 token 过期正在自动刷新），连续超过10次才停止
             pollErrorCount++;
+
+            // 检测是否已被登出（token刷新失败导致）
+            const currentToken = useAuthStore.getState().accessToken;
+            if (!currentToken) {
+              // Token 已被清除（refresh 失败触发了 logout），立即停止
+              stopPolling();
+              setVideoGenerating(false);
+              setVideoResult(prev => prev ? { ...prev, status: 'failed' as const, errorMessage: '登录已过期，请重新登录后继续' } : null);
+              setError('登录已过期，请重新登录后查看视频状态');
+              return; // 退出轮询
+            }
+
             if (pollErrorCount >= 10) {
               stopPolling();
               setVideoGenerating(false);
-              setVideoResult(prev => prev ? { ...prev, status: 'failed', errorMessage: '轮询中断，请点击重新生成' } : null);
+              setVideoResult(prev => prev ? { ...prev, status: 'failed' as const, errorMessage: '轮询中断，请点击重新生成' } : null);
               setError('轮询中断，请刷新页面后重试');
             }
           }
@@ -432,6 +445,17 @@ export function useShouzuoVideo() {
         }
       } catch {
         pollErrorCount++;
+
+        // 检测是否已被登出（token刷新失败导致）
+        const currentToken = useAuthStore.getState().accessToken;
+        if (!currentToken) {
+          stopPolling();
+          setVideoGenerating(false);
+          setVideoResult(prev => prev ? { ...prev, status: 'failed' as const, errorMessage: '登录已过期，请重新登录后继续' } : null);
+          setError('登录已过期，请重新登录后查看视频状态');
+          return;
+        }
+
         if (pollErrorCount >= 10) {
           stopPolling();
           setVideoGenerating(false);
