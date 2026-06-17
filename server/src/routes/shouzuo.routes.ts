@@ -1,5 +1,5 @@
 // ============================================================
-// 种草视频路由 API (6步工作流版)
+// 服饰短片路由 API (6步工作流版)
 // ============================================================
 
 import type { FastifyInstance } from "fastify";
@@ -333,7 +333,7 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
 
     // 积分扣减：3 积分
     try {
-      creditsService.deduct(userId, 3, id, "种草视频-服装预处理");
+      creditsService.deduct(userId, 3, id, "服饰短片-服装预处理");
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
       if (errMsg.includes("余额不足") || errMsg.includes("Insufficient")) {
@@ -362,7 +362,7 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
       // 调用 GPT-Image-2 edits API 生成穿着效果图
       const result = await gptImageService.editImage(
         fullProductImageUrl,
-        "Generate a full-body photo of a model wearing this exact garment, standing in a natural relaxed pose, neutral light gray background, soft even studio lighting, the garment is the clear focus with all details visible, model in a half-profile pose with face naturally turned slightly away from camera, no hair or accessories covering the face, professional fashion photography style."
+        "Professional fashion photo: a model wearing this garment in a relaxed standing pose, soft studio lighting, plain light gray background, garment details fully visible, half-body shot showing upper body and garment clearly, elegant fashion catalog style, high quality commercial photography."
       );
 
       if (result.success && result.resultUrl) {
@@ -374,24 +374,38 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
         }));
       } else {
         shouzuoService.updatePreprocessingStatus(id, userId, "failed");
-        return reply.status(500).send({ message: result.errorMessage || "预处理生成失败" });
+        // 退回积分
+        try {
+          creditsService.refund(userId, 3, id, `服饰短片-服装预处理失败退回(session:${id})`);
+        } catch (_) { /* ignore */ }
+        return reply.status(500).send({ message: result.errorMessage || "预处理生成失败，积分已退回" });
       }
     } catch (err: unknown) {
       shouzuoService.updatePreprocessingStatus(id, userId, "failed");
+      // 异常也退回积分
+      try {
+        creditsService.refund(userId, 3, id, `服饰短片-服装预处理异常退回(session:${id})`);
+      } catch (_) { /* ignore */ }
       const errMsg = err instanceof Error ? err.message : String(err);
-      return reply.status(500).send({ message: `预处理生成失败: ${errMsg}` });
+      return reply.status(500).send({ message: `预处理生成失败，积分已退回: ${errMsg}` });
     }
   });
 
   // ============================================================
-  // GET /session/:id/video — 查询视频任务状态（必须在 /session/:id 之前注册！）
+  // GET /session/:id/video — 查询视频任务状态（免认证，Session ID 即授权）
+  // 视频生成耗时5-15分钟，超过JWT有效期，轮询不能依赖Token
   // ============================================================
 
-  app.get("/session/:id/video", { preHandler: authMiddleware }, async (request, reply) => {
+  app.get("/session/:id/video", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const userId = request.userId!;
     const session = shouzuoService.getSession(id);
-    if (!session || session.user_id !== userId) {
+    if (!session) {
+      return reply.status(404).send({ message: "会话不存在" });
+    }
+
+    // 可选：有 Token 时校验归属，没有则跳过（允许过期后继续轮询）
+    const userId = (request as any).userId;
+    if (userId && session.user_id !== userId) {
       return reply.status(404).send({ message: "会话不存在" });
     }
 
@@ -446,7 +460,7 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
       if (completedCount === segments.length) {
         const urls = segments.map((s) => s.video_url!).filter(Boolean);
         const finalUrl = urls[0] || "";
-        shouzuoService.saveFinalVideoResult(id, userId, { video_url: finalUrl, status: "completed" });
+        shouzuoService.saveFinalVideoResult(id, session.user_id, { video_url: finalUrl, status: "completed" });
         return reply.send(successResponse({
           taskId: "",
           videoUrl: finalUrl,
@@ -458,7 +472,7 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
       }
 
       if (failedCount > 0) {
-        shouzuoService.saveFinalVideoResult(id, userId, { status: "failed", error: "部分视频段生成失败" });
+        shouzuoService.saveFinalVideoResult(id, session.user_id, { status: "failed", error: "部分视频段生成失败" });
         return reply.send(successResponse({
           taskId: "",
           videoUrl: null,
@@ -482,6 +496,63 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
       }));
     }
 
+    // Seedance 单段模式：有 video_task_id 时查询 DMXAPI 实际状态
+    if (session.video_task_id && session.video_task_id !== "pending") {
+      try {
+        const { DMXAPIVideoAdapter } = await import("../adapters/dmxapi-video.adapter.js");
+        const adapter = new DMXAPIVideoAdapter("doubao-seedance-2-0-260128");
+        const status = await adapter.checkStatus(session.video_task_id);
+
+        if (status.status === "completed" && status.resultUrl) {
+          // 视频已完成，保存结果到 DB
+          shouzuoService.saveFinalVideoResult(id, session.user_id, { video_url: status.resultUrl, status: "completed" });
+          return reply.send(successResponse({
+            taskId: "",
+            videoUrl: status.resultUrl,
+            thumbnailUrl: status.resultUrl,
+            status: "completed",
+            duration: session.video_params_json ? JSON.parse(session.video_params_json).duration : 10,
+            progress: 100,
+          }));
+        } else if (status.status === "failed") {
+          // 视频生成失败
+          shouzuoService.saveFinalVideoResult(id, session.user_id, { status: "failed", error: status.errorMessage || "Seedance 视频生成失败" });
+          return reply.send(successResponse({
+            taskId: "",
+            videoUrl: null,
+            thumbnailUrl: null,
+            status: "failed",
+            duration: 0,
+            progress: 0,
+            errorMessage: status.errorMessage || "视频生成失败",
+          }));
+        }
+
+        // 仍在处理中，返回真实进度（DMXAPI 返回的进度）
+        const progress = status.progress ?? 50;
+        return reply.send(successResponse({
+          taskId: session.video_task_id,
+          videoUrl: null,
+          thumbnailUrl: null,
+          status: "processing",
+          duration: session.video_params_json ? JSON.parse(session.video_params_json).duration : 10,
+          progress: Math.min(progress, 95), // 最多95%，完成时才100%
+        }));
+      } catch (err: unknown) {
+        // 查询失败（DMXAPI 暂时不可用等），返回缓存状态
+        console.error(`[shouzuo] Seedance状态查询失败(session:${id}, taskId:${session.video_task_id}):`, err instanceof Error ? err.message : err);
+        return reply.send(successResponse({
+          taskId: "",
+          videoUrl: null,
+          thumbnailUrl: null,
+          status: "processing",
+          duration: session.video_params_json ? JSON.parse(session.video_params_json).duration : 10,
+          progress: 50,
+        }));
+      }
+    }
+
+    // 无 video_task_id 或 taskId 为 "pending"（刚提交还未拿到真实ID）
     return reply.send(successResponse({
       taskId: "",
       videoUrl: null,
@@ -625,7 +696,7 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
 
     // 积分扣减：每帧 3 积分
     const storyboardCost = body.storyboardCount * 3;
-    chargeCredits(userId, storyboardCost, body.sessionId, `种草视频-故事板生成(${body.storyboardCount}帧 × 3积分)`);
+    chargeCredits(userId, storyboardCost, body.sessionId, `服饰短片-故事板生成(${body.storyboardCount}帧 × 3积分)`);
     console.log(`[Shouzuo Storyboard] 已扣减 ${storyboardCost} 积分 (userId=${userId})`);
 
     // 获取服装信息
@@ -747,6 +818,16 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
     shouzuoService.saveStoryboard(body.sessionId, userId, storyboardFrames);
 
     const failedCount = frames.filter((f) => f.status === "failed").length;
+
+    // 退回失败帧的积分
+    if (failedCount > 0) {
+      const refundAmount = failedCount * 3;
+      try {
+        creditsService.refund(userId, refundAmount, body.sessionId, `服饰短片-故事板${failedCount}帧生成失败退回`);
+        console.log(`[Shouzuo Storyboard] 已退还 ${refundAmount} 积分 (${failedCount}帧失败, userId=${userId})`);
+      } catch (_) { /* ignore */ }
+    }
+
     return reply.send(successResponse({
       frames: storyboardFrames,
       totalFrames: storyboardFrames.length,
@@ -837,11 +918,11 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
       }
 
       // 生成失败，退回积分
-      creditsService.refund(userId, 3, `重新生成分镜帧${seq}失败退回`);
+      creditsService.refund(userId, 3, body.sessionId, `重新生成分镜帧${seq}失败退回`);
       return reply.status(500).send({ message: result.errorMessage || "图片生成失败，积分已退回" });
     } catch (err: unknown) {
       // 异常也退回积分
-      creditsService.refund(userId, 3, `重新生成分镜帧${seq}异常退回`);
+      creditsService.refund(userId, 3, body.sessionId, `重新生成分镜帧${seq}异常退回`);
       const msg = err instanceof Error ? err.message : "生成失败";
       return reply.status(500).send({ message: `${msg}，积分已退回` });
     }
@@ -867,7 +948,7 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
     // 积分扣减（使用预扣的积分或直接扣减）
     const videoCost = shouzuoService.calculateEstimatedCredits(styleId, videoParams);
     if (!session.pre_deducted_credits) {
-      chargeCredits(userId, videoCost, body.sessionId, `种草视频-视频生成(${body.model}, ${videoParams.duration}s, ${body.resolution})`);
+      chargeCredits(userId, videoCost, body.sessionId, `服饰短片-视频生成(${body.model}, ${videoParams.duration}s, ${body.resolution})`);
     }
 
     // 标记 processing
@@ -927,8 +1008,8 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
 
         // 退还已扣除的视频生成积分
         try {
-          creditsService.refund(userId, videoCost, `种草视频-视频生成失败退回(session:${body.sessionId})`);
-          console.log(`[shouzuo] 已退还 ${videoCost} 积分 (userId=${userId})`);
+          creditsService.refund(userId, videoCost, body.sessionId, '服饰短片-视频生成失败退回');
+          console.log(`[shouzuo] 已退还 ${videoCost} 积分 (userId=${userId}, session=${body.sessionId})`);
         } catch (refundErr) {
           console.error('[shouzuo] 视频生成失败退款异常:', refundErr);
         }
@@ -983,8 +1064,8 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
 
           // 退还已扣除的视频生成积分
           try {
-            creditsService.refund(userId, videoCost, `种草视频-Kling段${i+1}生成失败退回(session:${body.sessionId})`);
-            console.log(`[shouzuo] 已退还 ${videoCost} 积分 (userId=${userId})`);
+            creditsService.refund(userId, videoCost, body.sessionId, `服饰短片-Kling段${i+1}生成失败退回`);
+            console.log(`[shouzuo] 已退还 ${videoCost} 积分 (userId=${userId}, session=${body.sessionId})`);
           } catch (refundErr) {
             console.error('[shouzuo] 视频生成退款异常:', refundErr);
           }
@@ -1034,7 +1115,7 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
 
     // 积分扣减
     const COPYWRITING_COST = shouzuoService.getModelCost("deepseek-chat");
-    chargeCredits(userId, COPYWRITING_COST, body.sessionId, "种草视频-AI文案生成");
+    chargeCredits(userId, COPYWRITING_COST, body.sessionId, "服饰短片-AI文案生成");
     console.log(`[Shouzuo Copywriting] 已扣减 ${COPYWRITING_COST} 积分 (userId=${userId})`);
 
     // 获取服装信息
@@ -1096,8 +1177,12 @@ export async function shouzuoRoutes(app: FastifyInstance): Promise<void> {
 
       return reply.send(successResponse(copywritingResult));
     } catch (err: unknown) {
+      // 退回积分
+      try {
+        creditsService.refund(userId, COPYWRITING_COST, body.sessionId, "服饰短片-文案生成失败退回");
+      } catch (_) { /* ignore */ }
       const errMsg = err instanceof Error ? err.message : String(err);
-      return reply.status(500).send({ message: `文案生成失败: ${errMsg}` });
+      return reply.status(500).send({ message: `文案生成失败，积分已退回: ${errMsg}` });
     }
   });
 

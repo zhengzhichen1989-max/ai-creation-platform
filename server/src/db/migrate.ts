@@ -358,7 +358,7 @@ export async function runMigration(): Promise<void> {
   console.log("[Migration] sms_codes 表创建完成");
 
   // ============================================================
-  // 种草视频模块迁移
+  // 服饰短片模块迁移
   // ============================================================
 
   // 新建 shouzuo_sessions 表
@@ -395,7 +395,7 @@ export async function runMigration(): Promise<void> {
   console.log("[Migration] shouzuo_sessions 索引创建完成");
 
   // ============================================================
-  // 种草视频模块增量迁移 — 添加新列
+  // 服饰短片模块增量迁移 — 添加新列
   // ============================================================
 
   // 添加 product_info 列（JSON: ShouzuoProductInfo）

@@ -5,7 +5,7 @@ import * as shouzuoApi from '@/api/shouzuoVideo';
 import type { CopywritingItem, CopywritingResult, ProductInfo, VideoParams, StoryboardFrame } from '@/types/shouzuo';
 
 /**
- * 种草视频主流程 Hook（6步工作流）
+ * 服饰短片主流程 Hook（6步工作流）
  * Step 1: 上传产品图 → 创建会话
  * Step 2: AI 识别产品图 + 风格推荐
  * Step 3: 确认视频参数 + 预扣积分

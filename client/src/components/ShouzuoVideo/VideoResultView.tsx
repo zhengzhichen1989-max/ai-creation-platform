@@ -10,9 +10,10 @@ interface VideoResultViewProps {
   isPolling: boolean;
   onDownload?: () => void;
   onRetry?: () => void;
+  onNextStep?: () => void;  // 视频完成后跳转到下一步（AI文案+导出）
 }
 
-export default function VideoResultView({ result, isGenerating, isPolling, onDownload, onRetry }: VideoResultViewProps) {
+export default function VideoResultView({ result, isGenerating, isPolling, onDownload, onRetry, onNextStep }: VideoResultViewProps) {
   // 初始加载
   if ((isGenerating || isPolling) && !result) {
     return (
@@ -33,8 +34,8 @@ export default function VideoResultView({ result, isGenerating, isPolling, onDow
         <Typography variant="h6" sx={{ mb: 1 }}>
           <PlayCircleIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
           {isMultiSegment
-            ? `正在生成种草视频 (${result.segmentCompleted}/${result.segmentCount} 段)`
-            : '正在生成种草视频'}
+            ? `正在生成服饰短片 (${result.segmentCompleted}/${result.segmentCount} 段)`
+            : '正在生成服饰短片'}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           {isMultiSegment
@@ -144,6 +145,35 @@ export default function VideoResultView({ result, isGenerating, isPolling, onDow
               }}
             >
               ⬇️ 下载视频
+            </button>
+          )}
+          {onNextStep && (
+            <button
+              type="button"
+              onClick={onNextStep}
+              style={{
+                background: 'transparent',
+                color: '#7c3aed',
+                border: '2px solid #7c3aed',
+                borderRadius: 20,
+                padding: '8px 20px',
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                width: '100%',
+                marginTop: '8px',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#7c3aed';
+                e.currentTarget.style.color = '#fff';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = '#7c3aed';
+              }}
+            >
+              下一步 → AI文案+导出
             </button>
           )}
         </Box>

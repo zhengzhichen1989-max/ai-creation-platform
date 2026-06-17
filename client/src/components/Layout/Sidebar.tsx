@@ -26,7 +26,7 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { label: '工作台', path: '/workspace', icon: <CreateIcon /> },
-  { label: '种草视频', path: '/shouzuo-video', icon: <VideocamIcon /> },
+  { label: '服饰短片', path: '/shouzuo-video', icon: <VideocamIcon /> },
   { label: '历史记录', path: '/history', icon: <HistoryIcon /> },
   { label: '积分充值', path: '/credits', icon: <AccountBalanceWalletIcon /> },
   { label: '个人中心', path: '/profile', icon: <PersonIcon /> },

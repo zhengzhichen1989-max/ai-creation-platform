@@ -1,5 +1,5 @@
 // ============================================================
-// 种草视频 - 完成面板组件
+// 服饰短片 - 完成面板组件
 // ============================================================
 
 import { Box, Typography, Button, Stack, Card, CardContent, CardMedia, Chip, Divider } from '@mui/material';
@@ -38,7 +38,7 @@ export default function CompletionPanel({
             🎉 生成完成！
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            您的种草视频和文案已生成完毕
+            您的服饰短片和文案已生成完毕
           </Typography>
         </>
       )}
@@ -152,7 +152,7 @@ export default function CompletionPanel({
           onClick={onNewSession}
           size="large"
         >
-          新建种草视频
+          新建服饰短片
         </Button>
       </Stack>
     </Box>

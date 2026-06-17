@@ -1,5 +1,5 @@
 // ============================================================
-// 种草视频 - 生成预览组件
+// 服饰短片 - 生成预览组件
 // ============================================================
 
 import { Box, Typography, Divider, Stack, Chip, LinearProgress, Alert, Button, Card, CardMedia, CircularProgress } from '@mui/material';

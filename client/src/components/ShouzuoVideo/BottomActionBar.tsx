@@ -1,5 +1,5 @@
 // ============================================================
-// 种草视频 - 底部操作按钮组件
+// 服饰短片 - 底部操作按钮组件
 // ============================================================
 
 import { Box, Button, Stack } from '@mui/material';
@@ -79,7 +79,7 @@ export default function BottomActionBar({
               disabled={isProcessing}
               size="large"
             >
-              {isGenerating ? '生成中...' : '一键生成种草视频'}
+              {isGenerating ? '生成中...' : '一键生成服饰短片'}
             </Button>
           )}
 

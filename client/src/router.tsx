@@ -9,6 +9,7 @@ import CreditsPage from '@/pages/CreditsPage';
 import ProfilePage from '@/pages/ProfilePage';
 import AdminPage from '@/pages/AdminPage';
 import ShouzuoVideoPage from '@/pages/ShouzuoVideoPage';
+import ToyVideoPage from '@/pages/ToyVideoPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import type { ReactNode } from 'react';
@@ -81,6 +82,7 @@ export default function AppRouter() {
         <Route index element={<Navigate to="/workspace" replace />} />
         <Route path="workspace" element={<WorkspacePage />} />
         <Route path="shouzuo-video" element={<ShouzuoVideoPage />} />
+        <Route path="toy-video" element={<ToyVideoPage />} />
         <Route path="history" element={<HistoryPage />} />
         <Route path="credits" element={<CreditsPage />} />
         <Route path="profile" element={<ProfilePage />} />

@@ -287,7 +287,8 @@ export type AdminAction =
   | "batch_topup"
   | "reset_password"
   | "disable_user"
-  | "enable_user";
+  | "enable_user"
+  | "delete_user";
 
 /** 批量充值结果 */
 export interface BatchTopupResult {

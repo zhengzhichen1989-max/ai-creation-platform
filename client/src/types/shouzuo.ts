@@ -1,4 +1,4 @@
-/** 种草视频工作流步骤（6步新版） */
+/** 服饰短片工作流步骤（6步新版） */
 export type ShouzuoStep =
   | 'upload'         // Step 1: 上传产品图
   | 'ai_recognize'   // Step 2: AI 识别产品图 + 风格推荐
@@ -135,7 +135,7 @@ export interface VideoSegment {
   error?: string;
 }
 
-/** 种草视频生成结果 */
+/** 服饰短片生成结果 */
 export interface ShouzuoVideoResult {
   taskId: string;
   videoUrl: string | null;
@@ -174,7 +174,7 @@ export interface CopywritingItem {
 // 会话状态
 // ============================================================
 
-/** 种草视频会话状态 */
+/** 服饰短片会话状态 */
 export interface ShouzuoSession {
   sessionId: string;
   currentStep: ShouzuoStep;

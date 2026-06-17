@@ -200,6 +200,53 @@ export function batchTopup(
   return { successCount, failCount };
 }
 
+/** 删除用户账号及关联数据 */
+export function deleteUser(userId: number, adminId: number): void {
+  const db = getDb();
+
+  // 检查用户是否存在
+  const userRows = db.exec("SELECT id, role, email FROM users WHERE id = ?", [userId]);
+  if (userRows.length === 0 || userRows[0].values.length === 0) {
+    throw new UserNotFoundError(userId);
+  }
+
+  const userRole = userRows[0].values[0][1] as string;
+  const userEmail = userRows[0].values[0][2] as string;
+
+  // 不允许删除管理员账户（自我保护）
+  if (userRole === "admin") {
+    throw new ValidationError("不能删除管理员账户");
+  }
+
+  // 临时关闭外键约束，以便按任意顺序删除关联数据
+  db.run("PRAGMA foreign_keys = OFF");
+
+  try {
+    // 删除关联数据（按照依赖关系，先删除引用 users 的子表记录）
+    db.run("DELETE FROM credit_transactions WHERE user_id = ?", [userId]);
+    db.run("DELETE FROM credit_accounts WHERE user_id = ?", [userId]);
+    db.run("DELETE FROM generation_tasks WHERE user_id = ?", [userId]);
+    db.run("DELETE FROM password_reset_tokens WHERE user_id = ?", [userId]);
+    db.run("DELETE FROM shouzuo_sessions WHERE user_id = ?", [userId]);
+    db.run("DELETE FROM orders WHERE user_id = ?", [userId]);
+    // 操作日志中 target_user_id 引用该用户，置为 NULL 保留日志
+    db.run("UPDATE admin_operation_logs SET target_user_id = NULL WHERE target_user_id = ?", [userId]);
+    // 最后删除用户本身
+    db.run("DELETE FROM users WHERE id = ?", [userId]);
+  } finally {
+    // 恢复外键约束
+    db.run("PRAGMA foreign_keys = ON");
+  }
+
+  saveDatabase();
+
+  // 记录操作日志（在用户删除之后，adminId 仍然存在）
+  adminOperationLogService.log(adminId, "delete_user", null, {
+    deletedUserId: userId,
+    deletedUserEmail: userEmail,
+  });
+}
+
 /** 内部辅助：检查用户是否存在 */
 function db_getUserStatus(userId: number): boolean {
   const db = getDb();

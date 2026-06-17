@@ -242,6 +242,11 @@ export async function adminUpdateUserStatus(id: number, status: string): Promise
   return res.data.data;
 }
 
+/** 删除用户账号 */
+export async function adminDeleteUser(id: number): Promise<void> {
+  await apiClient.delete(`/admin/users/${id}`);
+}
+
 /** 批量充值 */
 export async function adminBatchTopup(userIds: number[], amount: number, description: string): Promise<BatchTopupResult> {
   const res = await apiClient.post<ApiResponse<BatchTopupResult>>('/admin/users/batch-credit-topup', { userIds, amount, description });

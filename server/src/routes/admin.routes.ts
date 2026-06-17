@@ -435,6 +435,15 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     reply.send(successResponse(user));
   });
 
+  /** DELETE /users/:id — 删除用户账号及关联数据 */
+  app.delete("/users/:id", async (request, reply) => {
+    const params = userIdSchema.parse(request.params);
+    const adminId = request.userId!;
+
+    adminUserService.deleteUser(params.id, adminId);
+    reply.send(successResponse(null, "用户已删除"));
+  });
+
   /** POST /users/batch-credit-topup — 批量充值 */
   app.post("/users/batch-credit-topup", async (request, reply) => {
     const body = batchTopupSchema.parse(request.body);

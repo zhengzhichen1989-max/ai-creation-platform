@@ -151,7 +151,7 @@ export class PhoneExistsError extends AppError {
   }
 }
 
-/** 种草视频会话不存在 */
+/** 服饰短片会话不存在 */
 export class ShouzuoSessionNotFoundError extends AppError {
   constructor(sessionId: string) {
     super(`会话不存在: ${sessionId}`, 4001, 404);
@@ -159,7 +159,7 @@ export class ShouzuoSessionNotFoundError extends AppError {
   }
 }
 
-/** 种草视频会话状态不允许操作 */
+/** 服饰短片会话状态不允许操作 */
 export class ShouzuoSessionStateError extends AppError {
   constructor(message: string = "当前会话状态不允许此操作") {
     super(message, 4009, 400);
