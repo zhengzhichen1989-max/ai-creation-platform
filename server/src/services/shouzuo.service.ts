@@ -1,6 +1,6 @@
 // ===========================================================
 // 服装带货视频生成器 - 会话管理、故事板、视频生成、文案生成
-// 版本：2.1.0（6步工作流）
+// 版本：2.0.0（6步工作流）
 // ===========================================================
 
 import { getDb, saveDatabase } from "../db/index.js";
@@ -31,14 +31,6 @@ export interface StyleRecommendation {
   reason: string;
 }
 
-export interface ProductLock {
-  type: string;       // 产品类型锁定
-  color: string;      // 主色锁定
-  material: string;   // 面料锁定
-  key_features: string[]; // 关键设计特征
-  en_lock_description: string; // 英文锁定描述（30-50词）
-}
-
 export interface AiRecognitionResult {
   clothing_type: string;
   material: string;
@@ -47,9 +39,6 @@ export interface AiRecognitionResult {
   style_tags: string[];
   recommendations: StyleRecommendation[];
   raw_json?: string; // GPT-4o 原始返回
-  image_type?: 'flat_lay' | 'worn' | 'unknown';  // 图片类型判断
-  needs_preprocessing?: boolean;                         // 是否需要预处理
-  product_lock?: ProductLock;                            // 产品锁定描述
 }
 
 export interface StoryboardFrame {
@@ -81,22 +70,19 @@ export interface ShouzuoSessionRow {
   id: string;
   user_id: number;
   status: string;
-  current_step: string;       // "upload"|"ai_recognize"|"preprocessing"|"video_params"|"storyboard"|"video"|"copywriting"
+  current_step: string;       // "upload"|"ai_recognize"|"video_params"|"storyboard"|"video"|"copywriting"
   uploaded_images: string;      // JSON string[]
-  ai_recognition_json: string | null;  // JSON - AiRecognitionResult (含 image_type / needs_preprocessing)
+  ai_recognition_json: string | null;  // JSON - AiRecognitionResult
   user_edited_clothing_json: string | null; // JSON - ClothingInfo (用户编辑后)
   selected_style_id: string | null;
   video_params_json: string | null;  // JSON - VideoParams
   storyboard_json: string | null;  // JSON - StoryboardFrame[]
   video_status: string | null;      // "pending"|"processing"|"completed"|"failed"
-  video_task_id: string | null;   // DMXAPI taskId（Seedance单段模式）
   video_url: string | null;
   video_segments_json: string | null; // JSON - VideoSegment[]
   video_error: string | null;
   copywriting_json: string | null;  // JSON - CopywritingResult
   pre_deducted_credits: number;  // Step 3 预扣积分
-  preprocessed_image_url: string | null; // 预处理生成的穿着效果图 URL
-  preprocessing_status: string | null; // "idle"|"generating"|"completed"|"failed"
   created_at: string;
   updated_at: string;
 }
@@ -109,6 +95,7 @@ export interface StyleStoryboardTemplate {
   purpose: string;
   prompt: string;
   prompt_cn: string;
+  negative_prompt?: string;  // 反向提示词，抑制"复制原图"倾向
 }
 
 export interface StyleVideoPrompts {
@@ -143,7 +130,7 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
     name: "日系森系",
     emoji: "🌿",
     tagline: "自然生活感，治愈系穿搭",
-    description: "柔和自然光、低饱和暖调、户外草地或木质场景，适合棉麻/钩针/文艺风服装",
+    description: "柔和自然光、低饱和暖调、户外草地或木质场景，适合棉麻/钩针/文艺风服装。镜头分配：1=产品特写(不露脸) | 2=半身侧面(不露脸) | 3=氛围侧影(轻微露脸·正身侧脸) | 4=半身背面(不露脸)",
     applicable_clothing_types: ["连衣裙", "开衫", "披肩", "围巾", "上装", "半裙", "手作编织"],
     applicable_materials: ["棉麻", "钩针", "羊毛", "棉", "亚麻", "蕾丝"],
     applicable_seasons: ["春", "秋"],
@@ -152,7 +139,7 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
     fallback_model: "kling-v3",
     default_resolution: "720p",
     default_storyboard_count: 4,
-    cost_hint: "分镜图12积分 + 视频按秒计费（Seedance 9积分/秒，Kling每段3.6积分/秒）",
+    cost_hint: "分镜图12积分 + 视频约45-85积分（视时长分辨率）",
     storyboards: [
       {
         seq: 1, name: "产品特写", purpose: "开场聚焦服装本体，阳光洒落展示材质质感",
@@ -160,17 +147,17 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
         prompt_cn: "基于产品图，生成纯产品展示图，画面中无人物。服装平铺在旧木长椅上或轻搭在自然木衣架上，背景是阳光花园，清晨阳光透过树叶在面料表面形成柔和斑驳光影。极致展示纹理细节。浅景深，模糊绿色植物背景，暖米白+柔和绿低饱和色调，宁静治愈氛围。"
       },
       {
-        seq: 2, name: "半身侧面", purpose: "腰部以上侧面 — ❌不露脸",
+        seq: 2, name: "半身侧面", purpose: "侧面半身展示服装版型和上身效果，上衣占画面主体，面部朝向侧面不露脸",
         prompt: "Based on the product image, generate a half-body side-profile outfit shot from waist up. The person in three-quarter side view, body turned so the face is directed away from camera and not visible, wearing the garment with relaxed natural posture. The garment — especially the upper body portion — occupies about 70% of the frame, its silhouette, fabric drape, and fit clearly visible in soft morning side-light. Shallow depth of field, low-saturation warm tones, the clothing is the clear visual focus.",
         prompt_cn: "基于产品图，生成腰部以上半身侧面穿搭图。人物呈四分之三侧面，面部朝离镜头方向不可见，穿着该服装姿态松弛自然。服装——尤其是上身部分——占画面约70%，轮廓、面料垂感和版型清晰可见。浅景深，低饱和暖色调，服装是明确的视觉焦点。"
       },
       {
-        seq: 3, name: "氛围侧影", purpose: "正身侧脸 半身 — ⚠️正身侧脸",
+        seq: 3, name: "氛围侧影", purpose: "唯一轻微露脸镜头，正身侧脸能看清服装正面版型，同时建立情感连接",
         prompt: "Based on the product image, generate an atmospheric portrait with body front-facing but face in side profile, shot from waist up. The person's body and the full front of the garment clearly visible to camera, but the face is turned to the side so facial features are only partially visible — loose wispy strands of hair gently drifting across the cheek, naturally veiling most facial features so the eyes and mouth are not clearly identifiable. Expression serene and contemplative. The garment occupies about 60% of the frame and remains the visual focus. Soft diffused natural light, shallow depth of field, warm muted tones. This is the only shot where partial face is visible — body faces camera but face never does.",
         prompt_cn: "基于产品图，生成身体正面但脸侧面的氛围肖像图，腰部以上。人物身体和服装正面完整朝镜头可见，但脸转向侧面使面部特征仅部分可见——碎发轻拂面颊，自然遮挡大部分面部特征。表情宁静沉思。服装占画面约60%并保持视觉焦点。柔和自然光，浅景深，暖色调低饱和。这是唯一面部部分可见的镜头——身体朝镜头但脸绝不正对。"
       },
       {
-        seq: 4, name: "半身背面", purpose: "腰部以上背面 — ❌不露脸",
+        seq: 4, name: "半身背面", purpose: "半身背面展示服装轮廓和背部细节，唯一背面镜头，服装占画面主体",
         prompt: "Based on the product image, generate a half-body back-view shot from waist up. The person facing away from camera, the garment's back silhouette, shoulder line, and fabric drape clearly visible and occupying about 70% of the frame. Hair falling naturally down the back, strands swaying gently. Soft morning light falling on the shoulders and upper back, shallow depth of field, low-saturation warm tones. The clothing is the clear visual focus — not a distant tiny figure, a close composed shot.",
         prompt_cn: "基于产品图，生成腰部以上半身背面图。人物背对镜头，服装的背面轮廓、肩线和面料垂感清晰可见，占画面约70%。头发自然垂于背后，发丝轻飘。清晨柔和光线落在肩膀和上背部，浅景深，低饱和暖色调。服装是明确的视觉焦点——不是远处的渺小身影，而是近距离构图。"
       },
@@ -192,7 +179,7 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
     name: "潮流街头",
     emoji: "🔥",
     tagline: "节奏卡点，态度穿搭",
-    description: "硬光高对比、城市水泥/霓虹场景、快节奏剪辑感，适合潮牌/运动装/年轻化服饰",
+    description: "硬光高对比、城市水泥/霓虹场景、快节奏剪辑感，适合潮牌/运动装/年轻化服饰。镜头分配：1=产品特写(不露脸) | 2=半身侧面(不露脸) | 3=半身背面(不露脸) | 4=氛围侧影(轻微露脸·正身侧脸) | 5=设计细节(不露脸) | 6=半身定格(不露脸)",
     applicable_clothing_types: ["卫衣", "夹克", "T恤", "短裤", "运动套装", "潮牌联名"],
     applicable_materials: ["牛仔", "尼龙", "涤纶", "棉", "科技面料"],
     applicable_seasons: ["春", "夏", "秋"],
@@ -201,7 +188,7 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
     fallback_model: "seedance-2.0",
     default_resolution: "1080p",
     default_storyboard_count: 6,
-    cost_hint: "分镜图18积分 + 视频按秒计费（Seedance 9积分/秒，Kling每段3.6积分/秒×6段）",
+    cost_hint: "分镜图18积分 + 视频约90-210积分（6段拼接，视时长分辨率）",
     storyboards: [
       {
         seq: 1, name: "产品特写", purpose: "开场聚焦服装本体，硬光高对比展示设计细节",
@@ -209,27 +196,27 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
         prompt_cn: "基于产品图，生成纯产品展示图，画面中无人物。服装挂在金属衣架上或平铺在水泥地面上，硬光定向侧光照射，强烈阴影和高对比光影展示印花、logo、缝线和面料纹理。城市水泥墙或暗色渐变背景。微距细节可见，色彩饱和，粗犷街头氛围。"
       },
       {
-        seq: 2, name: "半身侧面", purpose: "腰部以上侧面 — ❌不露脸",
+        seq: 2, name: "半身侧面", purpose: "侧面半身展示服装版型和上身效果，上衣占画面主体，面部朝向侧面不露脸",
         prompt: "Based on the product image, generate a half-body street-style shot in side profile from waist up. The person standing against a graffiti wall, body turned so face is directed away from camera and not visible, wearing the garment with confident urban attitude. The garment occupies about 70% of the frame, its silhouette, prints and fabric texture clearly visible. Hard side-lighting, colorful graffiti or neon reflections, high-contrast, saturated colors.",
         prompt_cn: "基于产品图，生成腰部以上半身侧面街头穿搭图。人物靠在涂鸦墙边，身体转向使面部朝离镜头方向不可见，穿着该服装姿态自信街头感。服装占画面约70%，轮廓、印花和面料纹理清晰可见。硬光侧光，周围有彩色涂鸦或霓虹反射，高对比，色彩饱和。"
       },
       {
-        seq: 3, name: "半身背面", purpose: "腰部以上背面 — ❌不露脸",
+        seq: 3, name: "半身背面", purpose: "半身背面展示服装轮廓和背部设计，唯一背面镜头，服装占画面主体",
         prompt: "Based on the product image, generate a half-body back-view shot from waist up. The person facing away from camera, wearing the garment, the back silhouette, shoulder line, and any back design details clearly visible and occupying about 70% of the frame. Hard lighting from the side creating rim light on the garment edges, urban concrete or dark background. The clothing is the clear visual focus.",
         prompt_cn: "基于产品图，生成腰部以上半身背面穿搭图。人物背对镜头，穿着该服装，背面轮廓、肩线和任何背部设计细节清晰可见，占画面约70%。硬光从侧面打入在服装边缘形成轮廓光，城市水泥或暗色背景。服装是明确的视觉焦点。"
       },
       {
-        seq: 4, name: "氛围侧影", purpose: "正身侧脸 半身 — ⚠️正身侧脸",
+        seq: 4, name: "氛围侧影", purpose: "唯一轻微露脸镜头，正身侧脸能看清服装正面版型，同时建立情感连接",
         prompt: "Based on the product image, generate an atmospheric urban portrait with body front-facing but face in side profile, shot from waist up. The person's body and the full front of the garment clearly visible to camera, but the face is turned to the side so facial features are only partially visible — messy hair blown across the face by urban wind, strands partially covering the eyes and cheeks so they are not clearly identifiable. Raw edgy attitude. The garment occupies about 60% of the frame and remains the visual focus. This is the only shot where partial face is visible — body faces camera but face never does.",
         prompt_cn: "基于产品图，生成身体正面但脸侧面的氛围感城市肖像图，腰部以上。人物身体和服装正面完整朝镜头可见，但脸转向侧面使面部特征仅部分可见——凌乱发丝被城市的风吹过面部，碎发半遮双眼和面颊。粗犷街头态度。服装占画面约60%并保持视觉焦点。这是唯一面部部分可见的镜头——身体朝镜头但脸绝不正对。"
       },
       {
-        seq: 5, name: "设计细节", purpose: "设计细节近景 — ❌不露脸",
+        seq: 5, name: "设计细节", purpose: "快速闪切展示设计细节，不露脸",
         prompt: "Based on the product image, generate a close-up detail shot of the garment's design highlights. Focus on prints, logos, zippers, tags, or unique design elements, artificial studio lighting with metallic reflections, dark background to isolate the subject. No person in frame — pure product and detail focus. Macro perspective, high sharpness, saturated colors.",
         prompt_cn: "基于产品图，生成服装设计亮点的近景细节图。聚焦印花、logo、拉链、标签或独特设计元素，人工打光金属质感反光，暗色背景突出主体。画面中无人物——纯粹产品和细节聚焦。微距视角，锐度高，色彩饱和。"
       },
       {
-        seq: 6, name: "半身定格", purpose: "腰部以上侧面定格 — ❌不露脸",
+        seq: 6, name: "半身定格", purpose: "结尾定格，半身侧面展示，服装占画面主体，留出版式空间",
         prompt: "Based on the product image, generate a freeze-frame ending shot from waist up. Half-body side-profile against a simplified urban background with spotlight effect, person perfectly still, garment fully displayed occupying about 70% of the frame. Generous negative space on one side reserved for text overlay, composed like a magazine cover freeze-frame. High-contrast lighting, saturated tones.",
         prompt_cn: "基于产品图，生成腰部以上定格结尾图。半身侧面轮廓，简化城市背景加聚光灯效果，人物完全静止，服装完整展示占画面约70%，色调统一。一侧大量留白空间用于加文字，构图如杂志封面定格。高对比光影，饱和色调。"
       },
@@ -253,7 +240,7 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
     name: "高级质感",
     emoji: "✨",
     tagline: "静谧大片，质感至上",
-    description: "电影感单一光源、极简背景、浅景深留白，适合高端女装/礼服/设计师品牌/高级面料",
+    description: "电影感单一光源、极简背景、浅景深留白，适合高端女装/礼服/设计师品牌/高级面料。镜头分配：1=产品特写(不露脸) | 2=氛围侧影(轻微露脸·正身侧脸) | 3=细节光影(不露脸)",
     applicable_clothing_types: ["礼服", "连衣裙", "西装外套", "风衣", "设计师款"],
     applicable_materials: ["真丝", "羊绒", "羊毛", "蕾丝", "缎面", "天鹅绒"],
     applicable_seasons: ["秋", "冬"],
@@ -262,7 +249,7 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
     fallback_model: "kling-v3",
     default_resolution: "1080p",
     default_storyboard_count: 3,
-    cost_hint: "分镜图9积分 + 视频按秒计费（Seedance 9积分/秒，Kling每段3.6积分/秒）",
+    cost_hint: "分镜图9积分 + 视频约70-130积分（视时长分辨率）",
     storyboards: [
       {
         seq: 1, name: "产品特写", purpose: "开场极简聚焦服装本体，单一强光源展示面料高级质感",
@@ -270,12 +257,12 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
         prompt_cn: "基于产品图，生成纯产品展示图，画面中无人物。服装在极简纯色背景上优雅展示，单一强定向光在面料边缘形成明显轮廓光。极致展示材质光泽、垂感和纹理。高端杂志产品摄影感，浅景深，单色背景，电影感打光。"
       },
       {
-        seq: 2, name: "氛围侧影", purpose: "正身侧脸 半身 — ⚠️正身侧脸",
+        seq: 2, name: "氛围侧影", purpose: "唯一轻微露脸镜头，正身侧脸能看清服装正面版型，同时建立情感连接",
         prompt: "Based on the product image, generate an atmospheric luxury portrait with body front-facing but face in side profile, shot from waist up. The person's body and the full front of the garment clearly visible to camera, but the face is turned to the side so facial features are only partially visible — elegant loose hair swept by a gentle wind across one side of the face, delicately veiling the eyes and facial features. Single soft directional light — Rembrandt or butterfly lighting — creating sophisticated shadows. Garment occupies about 60% of frame, shallow depth of field, high-end fashion editorial style, low-saturation monochromatic gradient tones. This is the only shot where partial face is visible — body faces camera but face never does.",
         prompt_cn: "基于产品图，生成身体正面但脸侧面的高级氛围肖像图，腰部以上。人物身体和服装正面完整朝镜头可见，但脸转向侧面使面部特征仅部分可见——优雅散发被柔风拂过脸的一侧，精致地轻遮眼睛和面部特征。单一柔和定向光源形成高级阴影。服装在画面中约占60%，极浅景深，高端时尚杂志风格。这是唯一面部部分可见的镜头——身体朝镜头但脸绝不正对。"
       },
       {
-        seq: 3, name: "细节光影", purpose: "面料细节近景 — ❌不露脸",
+        seq: 3, name: "细节光影", purpose: "结尾细节展示，面料在特殊光线下的质感，不露脸",
         prompt: "Based on the product image, generate a close-up of the fabric under dramatic lighting with no person in frame. Strong side-light or top-light reveals the texture of silk, wool, or lace, creating smooth gradients of highlight and shadow across the fabric surface. Dark or pure black background to emphasize the fabric's natural sheen and weave detail. Macro or close-up shot, precise focus, cinematic lighting, quiet and powerful ending.",
         prompt_cn: "基于产品图，生成面料在特殊光线下的细节特写图，画面中无人物。强侧光或顶光照射面料，展示丝绸、羊毛或蕾丝等纹理，光影在服装表面形成渐变。暗色或纯黑背景突出面料本身的光泽感和编织细节。微距或近景，焦点精确，电影感打光，安静有力量感的结尾。"
       },
@@ -296,7 +283,7 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
     name: "职场通勤",
     emoji: "💼",
     tagline: "实用种草，日常得体",
-    description: "明亮均匀光、办公室/咖啡厅场景、信息展示优先，适合职业装/衬衫/西装/日常通勤服饰",
+    description: "明亮均匀光、办公室/咖啡厅场景、信息展示优先，适合职业装/衬衫/西装/日常通勤服饰。镜头分配：1=产品特写(不露脸) | 2=半身正面(不露脸·正面朝镜头) | 3=氛围侧影(轻微露脸·正身侧脸) | 4=细节实用(不露脸)",
     applicable_clothing_types: ["衬衫", "西装", "烟管裤", "一步裙", "风衣", "通勤连衣裙"],
     applicable_materials: ["棉", "涤纶", "混纺", "雪纺", "羊毛"],
     applicable_seasons: ["春", "秋", "冬"],
@@ -305,7 +292,7 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
     fallback_model: "kling-v3",
     default_resolution: "720p",
     default_storyboard_count: 4,
-    cost_hint: "分镜图12积分 + 视频按秒计费（Seedance 9积分/秒，Kling每段3.6积分/秒）",
+    cost_hint: "分镜图12积分 + 视频约45-85积分（视时长分辨率）",
     storyboards: [
       {
         seq: 1, name: "产品特写", purpose: "开场聚焦服装本体，明亮均匀光展示版型和细节",
@@ -313,17 +300,17 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
         prompt_cn: "基于产品图，生成纯产品展示图，画面中无人物。服装整齐平铺在干净白色或浅木色表面上，明亮光照充足的环境，或挂在极简衣架上背景纯色干净。明亮均匀光线，色彩还原准确。完整服装可见，领口、纽扣、腰线等设计细节清晰展示。专业产品摄影风格，干净信息量大。"
       },
       {
-        seq: 2, name: "半身正面", purpose: "腰部以上正面 — ❌不露脸·正面朝镜头",
+        seq: 2, name: "半身正面", purpose: "正面展示服装完整版型，身体正面朝镜头，面部被手/文件/咖啡杯遮挡不露脸",
         prompt: "Based on the product image, generate a half-body front-facing outfit shot from waist up. The person facing the camera front-on, body and garment fully visible from the front, but the face is completely hidden — looking down at a phone, coffee cup, or document held in hands, or a hand naturally near the face area. Bright even office or cafe lighting, the garment occupies about 70% of the frame, its front silhouette, collar, and fit clearly visible. Professional atmosphere, accurate color reproduction.",
         prompt_cn: "基于产品图，生成腰部以上正面穿搭图。人物正面朝镜头，身体和服装从正面完整可见，但面部完全被遮挡——低头看手机、咖啡杯或手中文件，或一只手自然在面部附近。明亮均匀办公室或咖啡厅光线，服装占画面约70%，其正面轮廓、领口和版型清晰可见。职场氛围，色彩还原准确。"
       },
       {
-        seq: 3, name: "氛围侧影", purpose: "正身侧脸 半身 — ⚠️正身侧脸",
+        seq: 3, name: "氛围侧影", purpose: "唯一轻微露脸镜头，正身侧脸能看清服装正面版型，同时建立情感连接",
         prompt: "Based on the product image, generate an atmospheric portrait with body front-facing but face in side profile, shot from waist up. The person's body and the full front of the garment clearly visible to camera, but the face is turned to the side so facial features are only partially visible — loose strands of hair naturally falling across the cheek, partially concealing the eye and facial features so they are not clearly identifiable. Bright even office natural light or warm cafe light, professional and approachable expression, garment occupies about 60% of frame and is the visual focus. This is the only shot where partial face is visible — body faces camera but face never does.",
         prompt_cn: "基于产品图，生成身体正面但脸侧面的氛围肖像图，腰部以上。人物身体和服装正面完整朝镜头可见，但脸转向侧面使面部特征仅部分可见——碎发自然垂落面颊，轻遮眼睛和面部特征。明亮均匀办公室自然光或咖啡厅暖光，专业亲和表情，服装占画面约60%并为视觉焦点。这是唯一面部部分可见的镜头——身体朝镜头但脸绝不正对。"
       },
       {
-        seq: 4, name: "细节实用", purpose: "设计细节近景 — ❌不露脸",
+        seq: 4, name: "细节实用", purpose: "展示领口/袖口/腰线等设计细节，强化实穿信任感，不露脸",
         prompt: "Based on the product image, generate a styling detail shot with no face visible. Focus on collar, cuffs, waistline, buttons, or fabric drape — key design highlights — with a hand adjusting the collar or sleeve to draw attention. Light concentrated on the detail area, background slightly darkened. Medium close-up, high information density, professional atmosphere.",
         prompt_cn: "基于产品图，生成不露脸的穿搭细节图。聚焦领口、袖口、腰线、纽扣或面料垂感等设计亮点，手部配合整理领口或袖口吸引注意力。光线聚焦在细节处，背景适度暗化。中近景，信息密度高，专业氛围。"
       },
@@ -345,7 +332,7 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
     name: "剧情植入",
     emoji: "🎬",
     tagline: "故事带入，情绪种草",
-    description: "叙事驱动的场景切换、从犹豫到自信的情绪弧线、真实生活场景，适合任何服装的情景化展示",
+    description: "叙事驱动的场景切换、从犹豫到自信的情绪弧线、真实生活场景，适合任何服装的情景化展示。镜头分配：1=产品特写(不露脸) | 2=半身正面(不露脸·正面朝镜头) | 3=半身背面(不露脸) | 4=氛围侧影(轻微露脸·正身侧脸) | 5=细节互动(不露脸)",
     applicable_clothing_types: ["连衣裙", "上装", "外套", "套装", "半裙", "任何服装"],
     applicable_materials: ["不限"],
     applicable_seasons: ["不限"],
@@ -354,7 +341,7 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
     fallback_model: "seedance-2.0",
     default_resolution: "1080p",
     default_storyboard_count: 5,
-    cost_hint: "分镜图15积分 + 视频按秒计费（Seedance 9积分/秒，Kling每段3.6积分/秒×5段）",
+    cost_hint: "分镜图15积分 + 视频约75-175积分（5段拼接，视时长分辨率）",
     storyboards: [
       {
         seq: 1, name: "产品特写", purpose: "开场聚焦服装本体，从衣柜或穿衣场景自然引入产品",
@@ -362,22 +349,22 @@ const STYLE_TEMPLATES: StyleTemplate[] = [
         prompt_cn: "基于产品图，生成自然产品展示图，画面中无脸。服装挂在打开的衣柜里或平铺在床上，旁边搭配配饰——包、鞋子或首饰——仿佛正在准备出门。室内温暖自然光，真实卧室或更衣区背景，柔和阴影。纯粹产品和搭配情境聚焦，自然生活感瞬间。"
       },
       {
-        seq: 2, name: "半身正面", purpose: "腰部以上正面 — ❌不露脸·正面朝镜头",
+        seq: 2, name: "半身正面", purpose: "正面展示服装完整版型，身体正面朝镜头，面部被镜子/手机遮挡不露脸",
         prompt: "Based on the product image, generate a half-body front-facing lifestyle shot from waist up. The person facing the camera front-on, body and garment fully visible from the front, but the face is completely hidden — reflected in the mirror at an angle that shows the back or side, or looking down at a phone, or a hand near the face. Soft indoor natural light, authentic home background, candid getting-ready atmosphere. The garment occupies about 70% of the frame, its front silhouette clearly visible.",
         prompt_cn: "基于产品图，生成腰部以上正面生活化场景图。人物在镜子前正面朝镜头，身体和服装从正面完整可见，但面部完全被遮挡——镜中倒影角度只显示背面或侧面，或低头看手机，或一只手在面部附近。柔和室内自然光，真实家中背景，自然准备出门氛围。服装占画面约70%，其正面轮廓清晰可见。"
       },
       {
-        seq: 3, name: "半身背面", purpose: "腰部以上背面 — ❌不露脸",
+        seq: 3, name: "半身背面", purpose: "半身背面展示服装轮廓和背部设计，唯一背面镜头，服装占画面主体",
         prompt: "Based on the product image, generate a half-body back-view shot from waist up. The person facing away from camera, the garment's back silhouette, shoulder line, and any back design details clearly visible and occupying about 70% of the frame. Natural indoor or outdoor lighting, authentic surroundings. The clothing is the clear visual focus — not a distant tiny figure, a close composed half-body shot.",
         prompt_cn: "基于产品图，生成腰部以上半身背面图。人物背对镜头，服装的背面轮廓、肩线和任何背部设计细节清晰可见，占画面约70%。自然室内或户外光线，真实周围环境。服装是明确的视觉焦点——不是远处的渺小身影，而是近距离半身构图。"
       },
       {
-        seq: 4, name: "氛围侧影", purpose: "正身侧脸 半身 — ⚠️正身侧脸",
+        seq: 4, name: "氛围侧影", purpose: "唯一轻微露脸镜头，正身侧脸能看清服装正面版型，同时建立情感连接",
         prompt: "Based on the product image, generate an emotional storytelling portrait with body front-facing but face in side profile, shot from waist up. The person's body and the full front of the garment clearly visible to camera, but the face is turned to the side so facial features are only partially visible — hair catching the wind and softly sweeping across the face, strands partially concealing the eyes and facial features. Natural outdoor or cafe lighting, authentic surroundings, confident relaxed expression. Garment occupies about 60% of frame and is the visual focus. This is the only shot where partial face is visible — body faces camera but face never does, candid and unposed.",
         prompt_cn: "基于产品图，生成身体正面但脸侧面的情绪化故事肖像图，腰部以上。人物身体和服装正面完整朝镜头可见，但脸转向侧面使面部特征仅部分可见——发丝随风轻扫面部，碎发半遮双眼和面部特征。自然户外或咖啡厅光线，真实周围环境，自信松弛表情。服装占画面约60%并为视觉焦点。这是唯一面部部分可见以建立情感连接的镜头——身体朝镜头但脸绝不正对，自然非摆拍。"
       },
       {
-        seq: 5, name: "细节互动", purpose: "手部/服装细节近景 — ❌不露脸",
+        seq: 5, name: "细节互动", purpose: "展示手部与服装互动的细节，强化真实感和代入感，不露脸",
         prompt: "Based on the product image, generate a detail shot of hands interacting with the garment. Adjusting a collar, buttoning up, pulling a zipper, or smoothing the fabric — a captured action moment. Hands clearly in motion, focused on the clothing detail. Medium close-up, no face visible, focus on the action and garment design. Authentic and practical feel, natural lighting.",
         prompt_cn: "基于产品图，生成手部与服装互动的细节图。整理衣领、系扣子、拉拉链或抚平面料等动作瞬间。手部动作清晰，聚焦服装细节。中近景，面部不可见，焦点在动作和服装设计。真实实用感，自然光线。"
       },
@@ -434,10 +421,7 @@ export function ensureShouzuoTable(): void {
   try { db.run("ALTER TABLE shouzuo_sessions ADD COLUMN video_params_json TEXT"); } catch (_) { /* ignore */ }
   try { db.run("ALTER TABLE shouzuo_sessions ADD COLUMN video_segments_json TEXT"); } catch (_) { /* ignore */ }
   try { db.run("ALTER TABLE shouzuo_sessions ADD COLUMN pre_deducted_credits INTEGER DEFAULT 0"); } catch (_) { /* ignore */ }
-  // v2.6 新增：服装预处理字段
-  try { db.run("ALTER TABLE shouzuo_sessions ADD COLUMN preprocessed_image_url TEXT"); } catch (_) { /* ignore */ }
-  try { db.run("ALTER TABLE shouzuo_sessions ADD COLUMN preprocessing_status TEXT DEFAULT 'idle'"); } catch (_) { /* ignore */ }
-  // 兼容：旧版本可能没有 video_segment_ids 字段
+  // 清理旧字段（如果存在）
   try { db.run("ALTER TABLE shouzuo_sessions DROP COLUMN style_id"); } catch (_) { /* ignore */ }
   try { db.run("ALTER TABLE shouzuo_sessions DROP COLUMN style_name"); } catch (_) { /* ignore */ }
   try { db.run("ALTER TABLE shouzuo_sessions DROP COLUMN video_thumbnail"); } catch (_) { /* ignore */ }
@@ -482,7 +466,6 @@ const SESSION_COLUMNS = [
   "selected_style_id", "video_params_json", "storyboard_json",
   "video_status", "video_url", "video_segments_json",
   "video_error", "copywriting_json", "pre_deducted_credits",
-  "preprocessed_image_url", "preprocessing_status",
   "created_at", "updated_at",
 ];
 
@@ -504,14 +487,12 @@ function mapRowToSession(row: unknown[]): ShouzuoSessionRow {
     video_error: row[13] as string | null,
     copywriting_json: row[14] as string | null,
     pre_deducted_credits: (row[15] as number) ?? 0,
-    preprocessed_image_url: row[16] as string | null,
-    preprocessing_status: row[17] as string | null,
-    created_at: row[18] as string,
-    updated_at: row[19] as string,
+    created_at: row[16] as string,
+    updated_at: row[17] as string,
   };
 }
 
-/** 创建服饰短片会话（Step 1：仅上传图片） */
+/** 创建种草视频会话（Step 1：仅上传图片） */
 export function createSession(
   userId: number,
   imageUrls: string[],
@@ -549,14 +530,11 @@ export function getSession(sessionId: string): ShouzuoSessionRow | null {
       video_params_json: row["video_params_json"] as string | null,
       storyboard_json: row["storyboard_json"] as string | null,
       video_status: row["video_status"] as string | null,
-      video_task_id: row["video_task_id"] as string | null,
       video_url: row["video_url"] as string | null,
       video_segments_json: row["video_segments_json"] as string | null,
       video_error: row["video_error"] as string | null,
       copywriting_json: row["copywriting_json"] as string | null,
       pre_deducted_credits: (row["pre_deducted_credits"] as number) ?? 0,
-      preprocessed_image_url: (row["preprocessed_image_url"] as string) ?? null,
-      preprocessing_status: (row["preprocessing_status"] as string) ?? null,
       created_at: row["created_at"] as string,
       updated_at: row["updated_at"] as string,
     };
@@ -578,15 +556,6 @@ export function listSessions(userId: number, page = 1, limit = 10): { items: Sho
 
   const items: ShouzuoSessionRow[] = (rows[0]?.values ?? []).map((row: unknown[]) => mapRowToSession(row));
   return { items, total };
-}
-
-/** 更新会话的故事板数据 */
-export function updateSessionStoryboard(sessionId: string, storyboardJson: string): void {
-  const db = getDb();
-  db.run(
-    "UPDATE shouzuo_sessions SET storyboard_json = ?, updated_at = datetime('now') WHERE id = ?",
-    [storyboardJson, sessionId],
-  );
 }
 
 // ===========================================================
@@ -614,48 +583,40 @@ export function saveAiRecognition(
 // Step 3：视频参数确认 + 积分预扣
 // ===========================================================
 
-/**
- * 计算预估积分 — 按秒计费
- * 公式：总分镜积分 + 总视频积分
- * 分镜积分 = storyboard_count × 3
- * 视频积分 = 每秒单价 × 时长（秒）
- *   Seedance 2.0：单段，720p = 10积分/秒，1080p = 25积分/秒
- *   Kling 3.0：  总时长，720p = 7积分/秒，1080p = 10积分/秒
- * 公式：videoCredits = duration × perSecond
- * 注意：仅计算视频部分积分，分镜积分在 Step 4 单独扣减
- * 向上取整（Math.ceil），避免小数积分
- */
 export function calculateEstimatedCredits(
   styleId: string,
   videoParams: VideoParams,
 ): number {
-  // 视频积分 — 按秒计费：duration × 每秒单价
-  const duration = videoParams.duration;
-  const resolution = videoParams.resolution;
+  const style = getStyleTemplate(styleId);
+  if (!style) return 0;
 
-  if (videoParams.model === "seedance-2.0") {
-    // Seedance 2.0：720p = 10/秒, 1080p = 25/秒
-    const perSecond = resolution === "1080p" ? 25 : 10;
-    return Math.ceil(perSecond * duration);
-  } else {
-    // Kling 3.0：720p = 7/秒, 1080p = 10/秒
-    const perSecond = resolution === "1080p" ? 10 : 7;
-    return Math.ceil(perSecond * duration);
-  }
+  // 分镜积分
+  const storyboardCredits = videoParams.storyboard_count * 3;
+
+  // 视频积分：按总秒数计算（与全局定价一致）
+  // Seedance 2.0: 720P=10积分/秒, 1080P=25积分/秒
+  // Kling 3.0: 720P=7积分/秒, 1080P=10积分/秒
+  const perSecond = videoParams.model === "seedance-2.0"
+    ? (videoParams.resolution === "1080p" ? 25 : 10)
+    : (videoParams.resolution === "1080p" ? 10 : 7);
+  const videoCredits = Math.ceil(videoParams.duration * perSecond);
+
+  return storyboardCredits + videoCredits;
 }
 
-/** 确认视频参数（不再预扣积分，改为生成完成后按实际扣减） */
+/** 确认视频参数 + 预扣积分 */
 export function confirmVideoParams(
   sessionId: string,
   userId: number,
   videoParams: VideoParams,
+  estimatedCredits: number,
 ): void {
   const db = getDb();
   const now = new Date().toISOString();
 
   db.run(
-    "UPDATE shouzuo_sessions SET video_params_json = ?, current_step = 'video_params', updated_at = ? WHERE id = ? AND user_id = ?",
-    [JSON.stringify(videoParams), now, sessionId, userId]
+    "UPDATE shouzuo_sessions SET video_params_json = ?, pre_deducted_credits = ?, current_step = 'video_params', updated_at = ? WHERE id = ? AND user_id = ?",
+    [JSON.stringify(videoParams), estimatedCredits, now, sessionId, userId]
   );
 
   saveDatabase();
@@ -712,41 +673,6 @@ export function saveStoryboard(
 }
 
 // ===========================================================
-// 服装预处理
-// ===========================================================
-
-/** 保存预处理结果（穿着效果图 URL） */
-export function savePreprocessedImage(
-  sessionId: string,
-  userId: number,
-  preprocessedImageUrl: string,
-): void {
-  const db = getDb();
-  const now = new Date().toISOString();
-  db.run(
-    "UPDATE shouzuo_sessions SET preprocessed_image_url = ?, preprocessing_status = 'completed', current_step = 'preprocessing', updated_at = ? WHERE id = ? AND user_id = ?",
-    [preprocessedImageUrl, now, sessionId, userId]
-  );
-  saveDatabase();
-}
-
-/** 更新预处理状态 */
-export function updatePreprocessingStatus(
-  sessionId: string,
-  userId: number,
-  status: 'generating' | 'completed' | 'failed',
-  error?: string,
-): void {
-  const db = getDb();
-  const now = new Date().toISOString();
-  db.run(
-    "UPDATE shouzuo_sessions SET preprocessing_status = ?, updated_at = ? WHERE id = ? AND user_id = ?",
-    [status, now, sessionId, userId]
-  );
-  saveDatabase();
-}
-
-// ===========================================================
 // Step 5：生成视频
 // ===========================================================
 
@@ -767,12 +693,14 @@ export function saveVideoTask(
       [JSON.stringify(segments), now, sessionId, userId]
     );
   } else {
-    // Seedance 单段模式：保存 video_task_id
+    // Seedance 单段模式
     db.run(
-      "UPDATE shouzuo_sessions SET video_status = 'processing', video_task_id = ?, video_url = NULL, video_error = NULL, updated_at = ? WHERE id = ? AND user_id = ?",
-      [taskId, now, sessionId, userId]
+      "UPDATE shouzuo_sessions SET video_status = 'processing', video_url = NULL, video_error = NULL, updated_at = ? WHERE id = ? AND user_id = ?",
+      [now, sessionId, userId]
     );
   }
+
+  saveDatabase();
 }
 
 /** 保存 Kling 多段视频生成结果（逐段更新） */
@@ -881,8 +809,8 @@ export function buildStoryboardPrompt(
     `Season: ${clothingInfo.season.join("/")}`,
   ].join(", ");
 
-  const prompt = `${frame.prompt}. ${clothingStr}. Photorealistic, high quality, 8k resolution, professional product photography.`;
-  return { prompt, name: frame.name };
+  const fullPrompt = `${frame.prompt}. ${clothingStr}. Photorealistic, high quality, 8k resolution, professional product photography.`;
+  return { prompt: fullPrompt, name: frame.name };
 }
 
 /** 获取视频生成提示词 */

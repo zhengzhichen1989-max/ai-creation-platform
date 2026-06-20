@@ -487,7 +487,6 @@ export default function ShouzuoVideoPage() {
             isPolling={isVideoPolling}
             onDownload={handleDownloadVideo}
             onRetry={generateVideo}
-            onNextStep={() => useShouzuoVideoStore.getState().setStep('copywriting')}
           />
         );
 
@@ -586,7 +585,7 @@ export default function ShouzuoVideoPage() {
         </button>
         <VideocamIcon sx={{ color: 'primary.main', fontSize: 28 }} />
         <Typography variant="h5">
-          AI 服饰短片生成器
+          AI 种草视频生成器
         </Typography>
       </Box>
 

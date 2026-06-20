@@ -34,7 +34,7 @@ export async function uploadImages(files: File[]): Promise<string[]> {
   return res.data.data.urls;
 }
 
-/** 创建服饰短片会话 */
+/** 创建种草视频会话 */
 export async function createSession(params: StartSessionParams): Promise<ShouzuoSession> {
   const res = await apiClient.post<ApiResponse<ShouzuoSession>>('/shouzuo/session', params, {
     timeout: 60000,

@@ -93,23 +93,29 @@ export default function VideoParamsForm({ onSubmit }: VideoParamsFormProps) {
     const res = localParams.resolution || '720p';
     const model = localParams.model || 'seedance-2.0';
 
-    // 分镜积分：每帧 3 积分（Step 4 单独扣减）
-    const storyboardCredits = sbCount * 3;
+    // 分镜积分：每帧 3 积分
+    let credits = sbCount * 3;
 
     // 视频积分（必须与后端 shouzuo.service.ts calculateEstimatedCredits 完全一致）
-    // 公式：duration × 每秒单价
-    let videoCredits = 0;
     if (model === 'kling-v3') {
-      // Kling 3.0：720p = 7/秒, 1080p = 10/秒
-      const perSecond = res === '1080p' ? 10 : 7;
-      videoCredits = Math.ceil(perSecond * dur);
+      // Kling：每段单独计费 × 段数（段数=分镜数）
+      const perSeg720p = dur <= 5 ? 18 : dur <= 8 ? 24 : dur <= 10 ? 30 : 40;
+      const perSeg1080p = dur <= 5 ? 28 : dur <= 8 ? 38 : dur <= 10 ? 48 : 60;
+      credits += (res === '1080p' ? perSeg1080p : perSeg720p) * sbCount;
     } else {
-      // Seedance 2.0：720p = 10/秒, 1080p = 25/秒
-      const perSecond = res === '1080p' ? 25 : 10;
-      videoCredits = Math.ceil(perSecond * dur);
+      // Seedance：单段，按分辨率+时长查表
+      const seedancePricing: Record<string, Record<number, number>> = {
+        '720p': { 5: 45, 8: 60, 10: 75, 15: 95 },
+        '1080p': { 5: 70, 8: 90, 10: 110, 15: 140 },
+      };
+      const table = seedancePricing[res] || seedancePricing['720p'];
+      // 找最接近的时长档位
+      const durations = Object.keys(table).map(Number).sort((a, b) => a - b);
+      const matchedDur = durations.find(d => dur <= d) || durations[durations.length - 1];
+      credits += table[matchedDur];
     }
 
-    return storyboardCredits + videoCredits;
+    return credits;
   };
 
   // Portal: 将确认按钮渲染到 document.body，彻底绕开所有 MUI 层叠上下文

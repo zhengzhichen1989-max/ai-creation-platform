@@ -1,5 +1,5 @@
 // ============================================================
-// 服饰短片 - 产品信息表单组件
+// 种草视频 - 产品信息表单组件
 // ============================================================
 
 import { Box, TextField, Typography, Paper } from '@mui/material';
@@ -25,7 +25,7 @@ export default function ProductInfoForm({
         产品信息
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        填写产品信息，帮助AI生成更精准的服饰短片和文案
+        填写产品信息，帮助AI生成更精准的种草视频和文案
       </Typography>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
