@@ -13,7 +13,9 @@ import { uploadRoutes } from "./upload.routes.js";
 import { proxyRoutes } from "./proxy.routes.js";
 import { paymentRoutes } from "./payment.routes.js";
 import { shouzuoRoutes } from "./shouzuo.routes.js";
-import { toyVideoRoutes } from "./toy-video.routes.js";
+import toyVideoRoutes from "./toy-video.routes.js";
+// 临时使用最小化版本恢复服务
+import smartVideoRoutes from "./smart-video-minimal.js";
 
 /** 注册所有路由 */
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
@@ -28,4 +30,5 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.register(paymentRoutes, { prefix: "/api/v1/payment" });
   app.register(shouzuoRoutes, { prefix: "/api/v1/shouzuo" });
   app.register(toyVideoRoutes, { prefix: "/api/v1/toy-video" });
+  app.register(smartVideoRoutes, { prefix: "/api/v1/smart-video" });
 }
